@@ -8,29 +8,30 @@ using Microsoft.Practices.EnterpriseLibrary.Data;
 
 namespace xpf.Scripting.SQLServer
 {
-    public class SqlScript : ScriptEngine<SqlScript>
+    public class SqlScriptEngine : ScriptEngine<SqlScriptEngine>
     {
         private string ConnectionString { get; set; }
         protected string DatabaseName { get; set; }
         protected int Timeout { get; set; }
 
-        public SqlScript(string databaseName)
+        public SqlScriptEngine(string databaseName)
         {
             this.DatabaseName = databaseName;
+            this.ParameterPrefix = "@";
         }
 
-        public SqlScript TakeSnapshot()
+        public SqlScriptEngine TakeSnapshot()
         {
             return this;
         }
 
-        public SqlScript WithConnectionString(string connectionString)
+        public SqlScriptEngine WithConnectionString(string connectionString)
         {
             this.ConnectionString = connectionString;
             return this;
         }
 
-        public SqlScript WithTimeout(int timeoutInSeconds)
+        public SqlScriptEngine WithTimeout(int timeoutInSeconds)
         {
             this.Timeout = timeoutInSeconds;
             return this;

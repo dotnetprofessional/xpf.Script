@@ -65,19 +65,10 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="ScriptEngineTest.cs" />
     <Compile Include="TestTable.cs" />
     <Compile Include="ScriptTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\xpf.Script.SQLServer\xpf.Script.SQLServer.csproj">
-      <Project>{7eac429e-69c1-46f5-a640-613891935496}</Project>
-      <Name>xpf.Script.SQLServer</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\xpf.Script\xpf.Script.csproj">
-      <Project>{2607f4a4-6c76-43ee-aa93-0441394e3559}</Project>
-      <Name>xpf.Script</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="DatabaseScripts\Execute_GetTestTableRecord.sql" />
@@ -127,6 +118,16 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="DatabaseSetup.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\xpf.Script.SQLServer\xpf.Script.SQLServer.csproj">
+      <Project>{7eac429e-69c1-46f5-a640-613891935496}</Project>
+      <Name>xpf.Script.SQLServer</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\xpf.Script\xpf.Script.csproj">
+      <Project>{2607f4a4-6c76-43ee-aa93-0441394e3559}</Project>
+      <Name>xpf.Script</Name>
+    </ProjectReference>
   </ItemGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '10.0' And '$(IsCodedUITest)' == 'True'">

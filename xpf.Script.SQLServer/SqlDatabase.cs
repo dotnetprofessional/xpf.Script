@@ -4,9 +4,9 @@ namespace xpf.Scripting
 {
     public static class SqlDatabase
     {
-        public static SqlScript Database(this Script script, string databaseName = null)
+        public static SqlScriptEngine Database(this Script script, string databaseName = null)
         {
-            return new SqlScript(databaseName);
+            return new SqlScriptEngine(databaseName);
         }
     }
 }

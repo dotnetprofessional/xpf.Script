@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 
@@ -14,12 +15,19 @@ namespace xpf.Scripting
         protected List<ScriptDetail> scriptsToExecute = new List<ScriptDetail>();
         protected bool EnableParallelExecutionProperty { get; set; }
 
+        protected bool EnableValidationsProperty { get; set; }
+
         protected ScriptEngine()
         {
             // This is a bit of a hack due to an issue of exposing GetCallingAssembly in a PCL
             // This method should only have an issue with WinRT apps and combining with native code
             // which is going to be rare. If this is the case, make use of the UsingAssembly method
             this.ScriptAssembly = Script.CallingAssembly;
+            this.ParameterPrefix = "";
+
+            // swith on validations by default when in debug mode
+            if (Debugger.IsAttached)
+                this.EnableValidations();
         }
 
         /// <summary>
@@ -49,6 +57,18 @@ namespace xpf.Scripting
             return (T) (object) this;
         }
 
+        /// <summary>
+        /// This is used to validate the scripts input/output parameters
+        /// If a scripting engine uses special characters to prefix parameters 
+        /// such as SQL with @ this allows the correct full name to be built.
+        /// </summary>
+        protected string ParameterPrefix { get; set; }
+        public T EnableValidations()
+        {
+            this.EnableValidationsProperty = true;
+            return (T)(object)this;
+        }
+
         public T UsingCommand(string commandText)
         {
             if (this.activeScript != null)
@@ -66,6 +86,9 @@ namespace xpf.Scripting
             if (this.activeScript == null)
                 throw new ArgumentException("Unable to add parameters without specifying a script first.");
 
+            if(this.activeScript.InParameters != null)
+                throw new ArgumentException("Unable to sepcify WithIn multiple times for a single script. Try adding addition parameters to the first use of WithIn\r\nExample: .WithIn(new {Property1 = \"a\", Property2=\"b\"})");
+
             this.activeScript.InParameters = inParameters;
 
             return (T)(object)this;
@@ -75,6 +98,9 @@ namespace xpf.Scripting
         {
             if (this.activeScript == null)
                 throw new ArgumentException("Unable to add parameters without specifying a script first.");
+
+            if (this.activeScript.OutParameters != null)
+                throw new ArgumentException("Unable to sepcify WithOut multiple times for a single script. Try adding addition parameters to the first use of WithOut\r\nExample: .WithOut(new {Property1 = \"a\", Property2=\"b\"})");
 
             this.activeScript.OutParameters = outParameters;
 
@@ -87,10 +113,44 @@ namespace xpf.Scripting
             if(this.activeScript != null)
                 this.scriptsToExecute.Add(this.activeScript);
 
+            if (this.EnableValidationsProperty)
+                this.ValidateScript();
+
+            // Perform some validations on the 
             // this is never used as this is an abstract class
             return null;
         }
 
+        /// <summary>
+        /// Perform validations of the script based on the input/output parameters
+        /// This is only performed during debug mode or when explicitly selected via EnableValidations()
+        /// </summary>
+        private void ValidateScript()
+        {
+            var validationOutput = "";
+            var scriptNumberCount = 0;
+            foreach (var s in this.scriptsToExecute)
+            {
+                scriptNumberCount ++;
+                // Validate all input parameters are being used by the script
+                if (s.InParameters != null)
+                    foreach (var p in s.InParameters.GetType().GetTypeInfo().DeclaredProperties)
+                    {
+                        if (!s.Command.Contains(string.Format("{0}{1}", this.ParameterPrefix, p.Name)))
+                            validationOutput += string.Format("Script number {0} is missing the input paramter: {1}\r\n", scriptNumberCount, p.Name);
+                    }
+
+                if (s.OutParameters != null)
+                    foreach (var p in s.OutParameters.GetType().GetTypeInfo().DeclaredProperties)
+                    {
+                        if (!s.Command.Contains(string.Format("{0}{1}", this.ParameterPrefix, p.Name)))
+                            validationOutput += string.Format("Script number {0} is missing the out paramter: {1}\r\n", scriptNumberCount, p.Name);
+                    }
+            }
+
+            if(validationOutput != "")
+                throw new KeyNotFoundException("The following errors were found processing the scripts:\r\n\r\n" + validationOutput);
+        }
         private string LoadScript(string embeddedScriptName)
         {
             string embeddedScript = EmbeddedResources.GetResourceString(this.ScriptAssembly, embeddedScriptName);
