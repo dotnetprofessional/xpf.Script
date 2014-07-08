@@ -38,3 +38,5 @@ __Execute scripts__
      .WithIn(new {CustomerId = 2, CustomerName = "John", Address = "124 Street"})
      .Execute();
 ``` 
+
+See the [WIKI](https://github.com/dotnetprofessional/xpf.Script/wiki) pages for more documentation on how to use the library.
