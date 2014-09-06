@@ -34,7 +34,7 @@ __Execute scripts__
 ``` CSharp
  var result = new Script()
      .Database() // Specifies to use the SQL Server Scripting engine
-     .UsingScript("Scripts.AddCustomerRecord.sql")
+     .UsingNestedScript("Scripts.AddCustomerRecord.sql")
      .WithIn(new {CustomerId = 2, CustomerName = "John", Address = "124 Street"})
      .Execute();
 ``` 
