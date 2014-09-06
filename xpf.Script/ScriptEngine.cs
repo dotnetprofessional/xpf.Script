@@ -34,9 +34,28 @@ namespace xpf.Scripting
             return (T) (object) this;
         }
 
+        public T UsingAssembly(object instance)
+        {
+            this.ScriptAssembly = instance.GetType().GetTypeInfo().Assembly;
+            return (T)(object)this;
+        }
+
         public T UsingScript(string scriptName)
         {
-            var script = this.LoadScript(scriptName);
+            var script = this.LoadScript(scriptName, false);
+            return this.UsingCommand(script);
+        }
+
+        /// <summary>
+        /// Loads the script resource and resolves any referenced or nested scripts then executes.
+        /// </summary>
+        /// <param name="scriptName"></param>
+        /// <returns>
+        /// This is a seperate method to UsingScript as there is a performance hit evaluating the nested scripts
+        /// </returns>
+        public T UsingNestedScript(string scriptName)
+        {
+            var script = this.LoadScript(scriptName, true);
             return this.UsingCommand(script);
         }
 
@@ -91,30 +110,38 @@ namespace xpf.Scripting
             return null;
         }
 
-        private string LoadScript(string embeddedScriptName)
+        string LoadScript(string embeddedScriptName, bool includeNested)
         {
             string embeddedScript = EmbeddedResources.GetResourceString(this.ScriptAssembly, embeddedScriptName);
-            // Convert to lines
-            var compositeScript = new StringBuilder();
-            var scriptLines = embeddedScript.Split(new[] { "\r", "\n" }, StringSplitOptions.None);
-            foreach (var line in scriptLines)
+            if (includeNested)
             {
-                var trimmedLine = line.Trim();
-                if (trimmedLine.StartsWith("include") ||
-                    trimmedLine.StartsWith(":r"))
+
+                // Convert to lines
+                var compositeScript = new StringBuilder();
+                var scriptLines = embeddedScript.Split(new[] {"\r", "\n"}, StringSplitOptions.None);
+                foreach (var line in scriptLines)
                 {
-                    // Include the embedded script
-                    var includeScript = trimmedLine.Substring(trimmedLine.IndexOf(" ", System.StringComparison.Ordinal) + 1);
-                    // If the script name is using the :r syntax it might have a sub-path defined, if so need to convert to dot notation
-                    includeScript = includeScript.Replace(@"\", ".");
+                    var trimmedLine = line.Trim();
+                    if (trimmedLine.StartsWith("include") ||
+                        trimmedLine.StartsWith(":r"))
+                    {
+                        // Include the embedded script
+                        var includeScript = trimmedLine.Substring(trimmedLine.IndexOf(" ", System.StringComparison.Ordinal) + 1);
+                        // If the script name is using the :r syntax it might have a sub-path defined, if so need to convert to dot notation
+                        includeScript = includeScript.Replace(@"\", ".");
 
-                    compositeScript.Append(this.LoadScript(includeScript));
+                        compositeScript.Append(this.LoadScript(includeScript, true));
+                    }
+                    else
+                        compositeScript.Append(line + "\r\n");
                 }
-                else
-                    compositeScript.Append(line + "\r\n");
-            }
 
-            return compositeScript.ToString();
+                return compositeScript.ToString();
+            }
+            else
+            {
+                return embeddedScript;
+            }
         }
     }
 }
