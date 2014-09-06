@@ -19,10 +19,11 @@ namespace xpf.Scripting.SQLServer
             this.DatabaseName = databaseName;
         }
 
-        public SqlScript TakeSnapshot()
-        {
-            return this;
-        }
+        // Removed until support is added
+        //public SqlScript TakeSnapshot()
+        //{
+        //    return this;
+        //}
 
         public SqlScript WithConnectionString(string connectionString)
         {

@@ -6,14 +6,14 @@
     <title>$title$</title>
     <authors>Garry McGlennon</authors>
     <owners>dotNetProfessional</owners>
-    <licenseUrl>https://github.com/dotnetprofessional/xpf/blob/master/LICENSE</licenseUrl>
-    <projectUrl>https://github.com/dotnetprofessional/xpf/</projectUrl>
+    <licenseUrl>https://github.com/dotnetprofessional/xpf.Script/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/dotnetprofessional/xpf.Script/wiki/SQLServer</projectUrl>
     <!--<iconUrl>http://ICON_URL_HERE_OR_DELETE_THIS_LINE</iconUrl>-->
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>$description$</description>
-    <releaseNotes>see https://github.com/dotnetprofessional/xpf/releases </releaseNotes>
+    <releaseNotes>see https://github.com/dotnetprofessional/xpf.Script/releases </releaseNotes>
     <copyright>Copyright 2014</copyright>
-    <tags>Scripting xpf.Script SQLServer SQL TDD BDD integration testing</tags>
+    <tags>Scripting xpf.Script SQLServer SQL TDD BDD integration testing dynamic sql</tags>
   </metadata>
   <files>
     <file src="*.transform" target="content\" />
