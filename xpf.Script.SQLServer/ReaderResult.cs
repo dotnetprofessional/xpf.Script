@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Text;
-using xpf.IO;
+using System.Xml.Serialization;
 
 namespace xpf.Scripting.SQLServer
 {
@@ -30,9 +31,9 @@ namespace xpf.Scripting.SQLServer
             if (nextResult)
             {
                 this.Fields = new FieldList();
-                for (int i = 0; i < _dataReader.FieldCount; i++)
+                for (int i = 0; i < this._dataReader.FieldCount; i++)
                 {
-                    this.Fields.Add(new Field(_dataReader.GetName(i), _dataReader[0]));
+                    this.Fields.Add(new Field(this._dataReader.GetName(i), this._dataReader[0]));
                 }
             }
 
@@ -65,7 +66,7 @@ namespace xpf.Scripting.SQLServer
 
                 // Now we have the XML we can try desearlizing it.
                 if (xmlBuilder.Length > 0)
-                    result = xmlBuilder.ToString().FromXmlToInstance<T>();
+                    result = FromXmlToInstance<T>(xmlBuilder.ToString());
             }
 
             return result;
@@ -93,7 +94,23 @@ namespace xpf.Scripting.SQLServer
 
         }
 
+        public static T FromXmlToInstance<T>(string xml, params Type[] extraTypes)
+            where T : class
+        {
+            return FromXmlStreamToInstance<T>(new MemoryStream(Encoding.UTF8.GetBytes(xml)));
+        }
 
+        public static T FromXmlStreamToInstance<T>(Stream stream, params Type[] extraTypes)
+            where T : class
+        {
+            T entity;
+            using (stream)
+            {
+                var xser = new XmlSerializer(typeof(T), extraTypes);
+                entity = xser.Deserialize(stream) as T;
+            }
+            return entity;
+        }
     }
 
 }
