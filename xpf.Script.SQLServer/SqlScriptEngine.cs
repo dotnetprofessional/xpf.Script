@@ -20,10 +20,11 @@ namespace xpf.Scripting.SQLServer
             this.ParameterPrefix = "@";
         }
 
-        public SqlScriptEngine TakeSnapshot()
-        {
-            return this;
-        }
+        // Removed until support is added
+        //public SqlScript TakeSnapshot()
+        //{
+        //    return this;
+        //}
 
         public SqlScriptEngine WithConnectionString(string connectionString)
         {

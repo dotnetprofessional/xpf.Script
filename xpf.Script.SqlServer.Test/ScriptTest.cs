@@ -94,20 +94,19 @@ namespace xpf.IO.Test
                     .WithOut(new { outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString })
                     .Execute();
 
-
                 Assert.AreEqual("Record X", result.Property.OutParam2);
             }
         }
 
         [TestMethod]
-        public void Execute_ScriptNameOnlyWithNestedInclude()
+        public void Execute_NestedScriptNameOnlyWithNestedInclude()
         {
             using (var x = new TransactionScope())
             {
                 string embeddedScriptName = "Execute_IncludeScript.sql";
                 new Script()
                     .Database()
-                    .UsingScript(embeddedScriptName)
+                    .UsingNestedScript(embeddedScriptName)
                     .Execute();
 
                 // Now verify that the update was successful
@@ -122,7 +121,7 @@ namespace xpf.IO.Test
         }
 
         [TestMethod]
-        public void Execute_ScriptNameOnlyWithNestedColonR()
+        public void Execute_NestedScriptNameOnlyWithNestedColonR()
         {
             using (var x = new TransactionScope())
             {
@@ -130,7 +129,7 @@ namespace xpf.IO.Test
 
                 new Script()
                     .Database()
-                    .UsingScript(embeddedScriptName)
+                    .UsingNestedScript(embeddedScriptName)
                     .Execute();
 
                 // Now verify that the update was successful
@@ -257,7 +256,8 @@ namespace xpf.IO.Test
             var result = new Script()
                 .Database()
                 .UsingScript(embeddedScriptName)
-                .ExecuteReader().FromXmlToInstance<List<TestTable>>();
+                .ExecuteReader()
+                .FromXmlToInstance<List<TestTable>>();
 
             Assert.AreEqual(27, result.Count);
         }
