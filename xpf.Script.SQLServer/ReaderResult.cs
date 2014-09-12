@@ -33,7 +33,7 @@ namespace xpf.Scripting.SQLServer
                 this.Fields = new FieldList();
                 for (int i = 0; i < this._dataReader.FieldCount; i++)
                 {
-                    this.Fields.Add(new Field(this._dataReader.GetName(i), this._dataReader[0]));
+                    this.Fields.Add(new Field(this._dataReader.GetName(i), this._dataReader[i]));
                 }
             }
 
