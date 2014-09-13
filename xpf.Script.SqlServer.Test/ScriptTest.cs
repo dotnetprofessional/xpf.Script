@@ -239,8 +239,8 @@ namespace xpf.IO.Test
                 while (result.NextRecord())
                 {
                     count ++;
-                    Assert.AreEqual("Record " + count, result.Field.Field1);
-                    Assert.AreEqual(count, result.Field.Id);
+                    Assert.AreEqual(count, result.Fields["Id"].Value);
+                    Assert.AreEqual("Record " + count, result.Fields["Field1"].Value);
                 }
 
                 // Now verify results
@@ -248,6 +248,28 @@ namespace xpf.IO.Test
             }
         }
 
+        [TestMethod]
+        public void ExecuteReader_Access_field_by_name()
+        {
+            string embeddedScriptName = "ExecuteReader_SelectAll.sql";
+
+            using (var result = new Script()
+                .Database()
+                .UsingScript(embeddedScriptName)
+                .ExecuteReader())
+            {
+                int count = 0;
+                while (result.NextRecord())
+                {
+                    count++;
+                    Assert.AreEqual(count, result.Field.Id);
+                    Assert.AreEqual("Record " + count, result.Field.Field1);
+                }
+
+                // Now verify results
+                Assert.AreEqual(3, count);
+            }
+        }
         [TestMethod]
         public void ExecuteReader_FromXmlToInstance()
         {
