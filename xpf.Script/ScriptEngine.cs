@@ -170,9 +170,15 @@ namespace xpf.Scripting
             if(validationOutput != "")
                 throw new KeyNotFoundException("The following errors were found processing the scripts:\r\n\r\n" + validationOutput);
         }
-        private string LoadScript(string embeddedScriptName, bool includeNested)
+
+        protected string LoadScript(string embeddedScriptName, bool includeNested)
         {
-            string embeddedScript = EmbeddedResources.GetResourceString(this.ScriptAssembly, embeddedScriptName);
+            return this.LoadScript(embeddedScriptName, includeNested, this.ScriptAssembly);
+        }
+
+        protected string LoadScript(string embeddedScriptName, bool includeNested, Assembly resourceAssembly)
+        {
+            string embeddedScript = EmbeddedResources.GetResourceString(resourceAssembly, embeddedScriptName);
             if (includeNested)
             {
 
