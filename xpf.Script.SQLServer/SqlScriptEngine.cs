@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Data.SqlClient;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Transactions;
 using Microsoft.Practices.EnterpriseLibrary.Data;
@@ -10,21 +12,62 @@ namespace xpf.Scripting.SQLServer
 {
     public class SqlScriptEngine : ScriptEngine<SqlScriptEngine>
     {
+        internal enum SnapshotMode
+        {
+            None,
+            TakeSnapshot,
+            Restore,
+            Delete
+        }
+
         private string ConnectionString { get; set; }
         protected string DatabaseName { get; set; }
         protected int Timeout { get; set; }
 
+        SnapshotMode SelectedSnapshotMode;
         public SqlScriptEngine(string databaseName)
         {
             this.DatabaseName = databaseName;
             this.ParameterPrefix = "@";
         }
 
-        // Removed until support is added
-        //public SqlScript TakeSnapshot()
-        //{
-        //    return this;
-        //}
+        /// <summary>
+        /// This method creates a snapshot of the database
+        /// </summary>
+        /// <returns></returns>
+        public SqlScriptEngine TakeSnapshot()
+        {
+            SetSnapshotMode(SnapshotMode.TakeSnapshot);
+            return this;
+        }
+
+        /// <summary>
+        /// This method restores a snapshot of the database
+        /// </summary>
+        /// <returns></returns>
+        public SqlScriptEngine RestoreSnapshot()
+        {
+            SetSnapshotMode(SnapshotMode.Restore);
+            return this;
+        }
+
+        /// <summary>
+        /// This method deletes a snapshot of the database
+        /// </summary>
+        /// <returns></returns>
+        public SqlScriptEngine DeleteSnapshot()
+        {
+            SetSnapshotMode(SnapshotMode.Delete);
+            return this;
+        }
+
+        void SetSnapshotMode(SnapshotMode snapshotMode)
+        {
+            if (this.SelectedSnapshotMode == SnapshotMode.None)
+                this.SelectedSnapshotMode = snapshotMode;
+            else
+                throw new ArgumentException("Only one snapshot mode can be set per execution. The snapshot mode is currently set to " + this.SelectedSnapshotMode);
+        }
 
         public SqlScriptEngine WithConnectionString(string connectionString)
         {
@@ -46,6 +89,41 @@ namespace xpf.Scripting.SQLServer
             // may want to refactor to have the ability to support groups
             var result = new Result();
 
+            if (this.SelectedSnapshotMode != SnapshotMode.None)
+            {
+                var snapShotScript = "";
+                // Perform the snapshot operation if requested
+                switch (SelectedSnapshotMode)
+                {
+                    case SnapshotMode.TakeSnapshot:
+                        snapShotScript = "SnapshotSQL.CreateSnapshot.sql";
+                        break;
+                    case SnapshotMode.Restore:
+                        snapShotScript = "SnapshotSQL.RestoreDatabase.sql";
+                        break;
+                    case SnapshotMode.Delete:
+                        snapShotScript = "SnapshotSQL.DeleteSnapshot.sql";
+                        break;
+                }
+
+                // Peform the snapshot operation
+                var script = this.LoadScript(snapShotScript, false, this.GetType().Assembly);
+                if (this.SelectedSnapshotMode == SnapshotMode.Restore)
+                {
+                    // A restore is a more complex operation that needs to run first against the target database
+                    // to get the database to restore. Then the result of that needs to run against the mater database
+
+                    // Step 1: Obtain the correct script by running intial script against target database
+                    var resultScript = this.Execute(new ScriptDetail {Command = script, OutParameters = new {SqlCmd = DbType.String}}); 
+
+                    // Step 2: Execute against the master database
+                    var engine = new Script().Database(this.ConnectionString).UsingMaster()
+                        .UsingCommand(resultScript[0].Value as string)
+                        .Execute();
+                }
+                else
+                    this.Execute(new ScriptDetail {Command = script});
+            }
 
             // determine if it shoudl be run in parallel
             if (this.EnableParallelExecutionProperty)
@@ -155,6 +233,23 @@ namespace xpf.Scripting.SQLServer
 
             return new ReaderResult(dataAccess.ExecuteReader(c));
         }
+
+        public SqlScriptEngine UseCataglog(string catalongName)
+        {
+            // Get the existing connection string and modify the inital catalog
+            var db = this.GetDatabase();
+
+            var cs = new SqlConnectionStringBuilder(db.ConnectionString);
+            cs.InitialCatalog = catalongName;
+            this.ConnectionString = cs.ConnectionString;
+            return this;
+        }
+
+        public SqlScriptEngine UsingMaster()
+        {
+            return this.UseCataglog("master");
+        }
+
         private static DbType ConvertToSqlType(Type datatype)
         {
             switch (datatype.Name)

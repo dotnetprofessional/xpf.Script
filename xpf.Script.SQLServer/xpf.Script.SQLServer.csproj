@@ -48,9 +48,9 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="xpf.Script, Version=0.0.5.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="xpf.Script, Version=0.1.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\xpf.Script.0.0.5.0\lib\portable-net45+win+wpa81\xpf.Script.dll</HintPath>
+      <HintPath>..\packages\xpf.Script.0.1.1.0\lib\portable-net45+win+wpa81\xpf.Script.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -65,6 +65,11 @@
     <None Include="app.config.transform" />
     <None Include="packages.config" />
     <None Include="xpf.Script.SQLServer.nuspec" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="SnapshotSQL\CreateSnapshot.sql" />
+    <EmbeddedResource Include="SnapshotSQL\DeleteSnapshot.sql" />
+    <EmbeddedResource Include="SnapshotSQL\RestoreDatabase.sql" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
