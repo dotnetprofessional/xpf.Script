@@ -63,7 +63,9 @@
   <ItemGroup>
     <None Include="Web.config.transform" />
     <None Include="app.config.transform" />
-    <None Include="packages.config" />
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
     <None Include="xpf.Script.SQLServer.nuspec" />
   </ItemGroup>
   <ItemGroup>
