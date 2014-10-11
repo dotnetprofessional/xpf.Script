@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Markup;
+using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using xpf.Scripting;
 
@@ -36,65 +37,39 @@ namespace xpf.Scripting.SqlServer.Test
         [TestMethod]
         public void When_calling_WithOut_more_than_once_for_a_script_will_throw_exception()
         {
-            try
-            {
-                new Script()
-                    .Database()
-                    .UsingCommand("SELECT * FROM TABLE")
-                    .WithOut(new { Property1 = "Hello" })
-                    .WithOut(new { Property2 = "Goodbye" });
+            Action action = () => new Script()
+                .Database()
+                .UsingCommand("SELECT * FROM TABLE")
+                .WithOut(new {Property1 = "Hello"})
+                .WithOut(new {Property2 = "Goodbye"});
 
-                Assert.Fail("Argument Exception expected");
-            }
-            catch (Exception ex)
-            {
-                Assert.AreEqual(typeof(ArgumentException), ex.GetType());
-            }
-
+            action.ShouldThrow<ArgumentException>();
         }
 
         [TestMethod]
         public void When_calling_Execute_using_WithIn_parameter_that_are_not_in_script_will_throw_exception_with_enable_validations()
         {
-            try
-            {
-                new Script()
-                    .Database()
-                    .EnableValidations()
-                    .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
-                    .WithIn(new { Property1 = "Hello", Property2 = "Goodbye" })
-                    .Execute();
+            Action action = () => new Script()
+                .Database()
+                .EnableValidations()
+                .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
+                .WithIn(new {Property1 = "Hello", Property2 = "Goodbye"})
+                .Execute();
 
-                Assert.Fail("KeyNotFoundException expected");
-            }
-            catch (Exception ex)
-            {
-                Assert.AreEqual(typeof(KeyNotFoundException), ex.GetType());
-                Assert.IsTrue(ex.Message.Contains("Property1"));
-                Assert.IsFalse(ex.Message.Contains("Property2"));
-            }
+            action.ShouldThrow<KeyNotFoundException>().WithMessage("*Property1*").Which.Message.Should().NotContain("Property2");
         }
 
         [TestMethod]
         public void When_calling_Execute_using_WithOut_parameter_that_are_not_in_script_will_throw_exception_with_enable_validations()
         {
-            try
-            {
-                new Script()
-                    .Database()
-                    .EnableValidations()
-                    .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
-                    .WithOut(new { Property1 = "Hello", Property2 = "Goodbye" })
-                    .Execute();
+            Action action = () => new Script()
+                .Database()
+                .EnableValidations()
+                .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
+                .WithOut(new {Property1 = "Hello", Property2 = "Goodbye"})
+                .Execute();
 
-                Assert.Fail("KeyNotFoundException expected");
-            }
-            catch (Exception ex)
-            {
-                Assert.AreEqual(typeof(KeyNotFoundException), ex.GetType());
-                Assert.IsTrue(ex.Message.Contains("Property1"));
-                Assert.IsFalse(ex.Message.Contains("Property2"));
-            }
+            action.ShouldThrow<KeyNotFoundException>().WithMessage("*Property1*").Which.Message.Should().NotContain("Property2");
         }
 
         [TestMethod]
@@ -173,6 +148,45 @@ namespace xpf.Scripting.SqlServer.Test
                 .Execute();
 
             Assert.AreEqual(0, actual.Property.Count);
+        }
+
+        [TestMethod]
+        public void When_taking_a_snapshot_that_currently_has_an_existing_snapshot_the_existing_snapshot_is_restored_before_taking_new_snapshot()
+        {
+            // Arrange - create a snapshot
+            new Script()
+                .Database()
+                .TakeSnapshot()
+                .Execute();
+
+            // Create a record within the working copy
+            new Script()
+                .Database()
+                .UsingCommand("INSERT INTO TestTable (id, Field1) VALUES(1000,'Snapshottest')")
+                .Execute();
+
+            // Act! - Take new Snapshot which should revert the previous working copy data
+            new Script()
+                .Database()
+                .TakeSnapshot()
+                .Execute();
+
+            // Validate that the new record from the working copy do not exist
+            var result = new Script()
+                .Database()
+                .UsingCommand("SELECT @Id = Id FROM TestTable WHERE Id = 1000")
+                .WithOut(new { Id = DbType.Int32 })
+                .Execute();
+
+            // Record shouldn't exist
+            Assert.AreEqual(DBNull.Value, result.Property.Id);
+
+            Assert.AreEqual(DBNull.Value, result.Property.Id);
+
+            new Script()
+                .Database()
+                .DeleteSnapshot()
+                .Execute();
         }
     }
 }

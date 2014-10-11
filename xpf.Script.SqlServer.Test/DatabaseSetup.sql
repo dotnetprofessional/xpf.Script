@@ -6,7 +6,7 @@
 
 CREATE DATABASE xpfScript
 Go
-USE xpfIOScript
+USE xpfScript
 GO
 /****** Object:  Table [dbo].[TestTable]    Script Date: 06/18/2009 14:18:42 ******/
 SET ANSI_NULLS ON

@@ -35,11 +35,14 @@ namespace xpf.Scripting.SQLServer
         /// This method creates a snapshot of the database
         /// </summary>
         /// <returns></returns>
-        public SqlScriptEngine TakeSnapshot()
+        public SqlScriptEngine TakeSnapshot(bool restoreExistingSnapshot = true)
         {
+            this.RestoreExistingSnapshot = restoreExistingSnapshot;
             SetSnapshotMode(SnapshotMode.TakeSnapshot);
             return this;
         }
+
+        private bool RestoreExistingSnapshot { get; set; }
 
         /// <summary>
         /// This method restores a snapshot of the database
@@ -114,12 +117,36 @@ namespace xpf.Scripting.SQLServer
                     // to get the database to restore. Then the result of that needs to run against the mater database
 
                     // Step 1: Obtain the correct script by running intial script against target database
-                    var resultScript = this.Execute(new ScriptDetail {Command = script, OutParameters = new {SqlCmd = DbType.String}}); 
+                    var resultScript = this.Execute(new ScriptDetail {Command = script, OutParameters = new {SqlCmd = DbType.String}});
 
                     // Step 2: Execute against the master database
                     var engine = new Script().Database(this.ConnectionString).UsingMaster()
                         .UsingCommand(resultScript[0].Value as string)
                         .Execute();
+                }
+                else if (this.SelectedSnapshotMode == SnapshotMode.TakeSnapshot && this.RestoreExistingSnapshot)
+                {
+                    this.RestoreExistingSnapshot = false;
+                    // Taking a snapshot when a snapshot already exists results in the new snapshot having the data that was added after the previous snapshot
+                    // as this is not what is typically expected, a restore needs to be performed first if the restoreExistingSnapshot (default:true) is set.
+
+                    // First we need to determine if there are any existing snapshots to restore, attempting to restore without snapshots will result in an exception
+                    var scriptCount = new Script().Database(this.ConnectionString)
+                        .UsingCommand("SELECT @Count = Count(*) FROM sys.databases sd WHERE sd.source_database_id = db_id()")
+                        .WithOut(new {Count = DbType.Int32})
+                        .Execute();
+
+                    if (scriptCount.Property.Count != 0)
+                    {
+                        // Temporarily set the Mode to Restore, then set it back to perform the TakeSnapshot
+                        this.SelectedSnapshotMode = SnapshotMode.Restore;
+                        this.Execute();
+
+                        // Even though a snapshot was requested by performing a restore its back to the same state
+                        // as a new snapshot so its not necessary to perform the actual snapshot.
+                    }
+                    else
+                        this.Execute(new ScriptDetail { Command = script });
                 }
                 else
                     this.Execute(new ScriptDetail {Command = script});
@@ -129,8 +156,9 @@ namespace xpf.Scripting.SQLServer
             if (this.EnableParallelExecutionProperty)
             {
                 // Check if there is a transient transaction if so throw a not supported exception
-                if(Transaction.Current != null)
-                    throw new NotSupportedException("Parallel execution does not support ambient transactions. Please remove the ambient (TransactionScope) transaction.");
+                if (Transaction.Current != null)
+                    throw new NotSupportedException(
+                        "Parallel execution does not support ambient transactions. Please remove the ambient (TransactionScope) transaction.");
 
                 // Need to keep track of the transaction due to transaction scope being tied to a single thread
                 var tasks = new List<Task>();
@@ -152,7 +180,17 @@ namespace xpf.Scripting.SQLServer
                     var r = this.Execute(s);
                     result.AddResult(r);
                 }
+
+            // Reset the object state so that chaining Executes is possible. Without doing this,
+            // multiple executes would repeat the previous scripts.
+            this.ResetState();
             return result;
+        }
+
+        private void ResetState()
+        {
+            this.SelectedSnapshotMode = SnapshotMode.None;
+
         }
 
         private FieldList Execute(ScriptDetail scriptDetail)
