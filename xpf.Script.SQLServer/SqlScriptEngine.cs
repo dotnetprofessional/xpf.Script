@@ -20,11 +20,12 @@ namespace xpf.Scripting.SQLServer
             Delete
         }
 
-        private string ConnectionString { get; set; }
+        string ConnectionString { get; set; }
         protected string DatabaseName { get; set; }
         protected int Timeout { get; set; }
 
         SnapshotMode SelectedSnapshotMode;
+
         public SqlScriptEngine(string databaseName)
         {
             this.DatabaseName = databaseName;
@@ -42,7 +43,7 @@ namespace xpf.Scripting.SQLServer
             return this;
         }
 
-        private bool RestoreExistingSnapshot { get; set; }
+        bool RestoreExistingSnapshot { get; set; }
 
         /// <summary>
         /// This method restores a snapshot of the database
@@ -58,8 +59,9 @@ namespace xpf.Scripting.SQLServer
         /// This method deletes a snapshot of the database
         /// </summary>
         /// <returns></returns>
-        public SqlScriptEngine DeleteSnapshot()
+        public SqlScriptEngine DeleteSnapshot(bool restoreExistingSnapshot = true)
         {
+            this.RestoreExistingSnapshot = restoreExistingSnapshot;
             SetSnapshotMode(SnapshotMode.Delete);
             return this;
         }
@@ -69,7 +71,8 @@ namespace xpf.Scripting.SQLServer
             if (this.SelectedSnapshotMode == SnapshotMode.None)
                 this.SelectedSnapshotMode = snapshotMode;
             else
-                throw new ArgumentException("Only one snapshot mode can be set per execution. The snapshot mode is currently set to " + this.SelectedSnapshotMode);
+                throw new ArgumentException("Only one snapshot mode can be set per execution. The snapshot mode is currently set to " +
+                                            this.SelectedSnapshotMode);
         }
 
         public SqlScriptEngine WithConnectionString(string connectionString)
@@ -92,65 +95,7 @@ namespace xpf.Scripting.SQLServer
             // may want to refactor to have the ability to support groups
             var result = new Result();
 
-            if (this.SelectedSnapshotMode != SnapshotMode.None)
-            {
-                var snapShotScript = "";
-                // Perform the snapshot operation if requested
-                switch (SelectedSnapshotMode)
-                {
-                    case SnapshotMode.TakeSnapshot:
-                        snapShotScript = "SnapshotSQL.CreateSnapshot.sql";
-                        break;
-                    case SnapshotMode.Restore:
-                        snapShotScript = "SnapshotSQL.RestoreDatabase.sql";
-                        break;
-                    case SnapshotMode.Delete:
-                        snapShotScript = "SnapshotSQL.DeleteSnapshot.sql";
-                        break;
-                }
-
-                // Peform the snapshot operation
-                var script = this.LoadScript(snapShotScript, false, this.GetType().Assembly);
-                if (this.SelectedSnapshotMode == SnapshotMode.Restore)
-                {
-                    // A restore is a more complex operation that needs to run first against the target database
-                    // to get the database to restore. Then the result of that needs to run against the mater database
-
-                    // Step 1: Obtain the correct script by running intial script against target database
-                    var resultScript = this.Execute(new ScriptDetail {Command = script, OutParameters = new {SqlCmd = DbType.String}});
-
-                    // Step 2: Execute against the master database
-                    var engine = new Script().Database(this.ConnectionString).UsingMaster()
-                        .UsingCommand(resultScript[0].Value as string)
-                        .Execute();
-                }
-                else if (this.SelectedSnapshotMode == SnapshotMode.TakeSnapshot && this.RestoreExistingSnapshot)
-                {
-                    this.RestoreExistingSnapshot = false;
-                    // Taking a snapshot when a snapshot already exists results in the new snapshot having the data that was added after the previous snapshot
-                    // as this is not what is typically expected, a restore needs to be performed first if the restoreExistingSnapshot (default:true) is set.
-
-                    // First we need to determine if there are any existing snapshots to restore, attempting to restore without snapshots will result in an exception
-                    var scriptCount = new Script().Database(this.ConnectionString)
-                        .UsingCommand("SELECT @Count = Count(*) FROM sys.databases sd WHERE sd.source_database_id = db_id()")
-                        .WithOut(new {Count = DbType.Int32})
-                        .Execute();
-
-                    if (scriptCount.Property.Count != 0)
-                    {
-                        // Temporarily set the Mode to Restore, then set it back to perform the TakeSnapshot
-                        this.SelectedSnapshotMode = SnapshotMode.Restore;
-                        this.Execute();
-
-                        // Even though a snapshot was requested by performing a restore its back to the same state
-                        // as a new snapshot so its not necessary to perform the actual snapshot.
-                    }
-                    else
-                        this.Execute(new ScriptDetail { Command = script });
-                }
-                else
-                    this.Execute(new ScriptDetail {Command = script});
-            }
+            PerformSnapshotOperation(this.SelectedSnapshotMode);
 
             // determine if it shoudl be run in parallel
             if (this.EnableParallelExecutionProperty)
@@ -187,10 +132,82 @@ namespace xpf.Scripting.SQLServer
             return result;
         }
 
+        void PerformSnapshotOperation(SnapshotMode mode)
+        {
+            switch (mode)
+            {
+                case SnapshotMode.TakeSnapshot:
+                    this.PerformTakeSnapshot();
+                    break;
+                case SnapshotMode.Restore:
+                    this.PerformRestoreSnapshot();
+                    break;
+                case SnapshotMode.Delete:
+                    this.PerformDeleteSnapshot();
+                    break;
+            }
+        }
+
+        void PerformTakeSnapshot()
+        {
+            var snapShotScript = "SnapshotSQL.CreateSnapshot.sql";
+            var script = this.LoadScript(snapShotScript, false, this.GetType().Assembly);
+
+            if (this.RestoreExistingSnapshot)
+                // Requesting a restore first will still leave the original snapshot so if a restore occured (true)
+                // then its not necessary to perform the snapshot as it already exists.
+                if (!this.PerformRestoreSnapshot())
+                    this.Execute(new ScriptDetail {Command = script});
+        }
+
+        bool PerformRestoreSnapshot()
+        {
+            var snapShotScript = "SnapshotSQL.RestoreDatabase.sql";
+            var script = this.LoadScript(snapShotScript, false, this.GetType().Assembly);
+
+
+            // First we need to determine if there are any existing snapshots to restore, attempting to restore without snapshots will result in an exception
+            var scriptCount = new Script().Database(this.ConnectionString)
+                .UsingCommand("SELECT @Count = Count(*) FROM sys.databases sd WHERE sd.source_database_id = db_id()")
+                .WithOut(new { Count = DbType.Int32 })
+                .Execute();
+
+            bool snapshotFound = scriptCount.Property.Count != 0;
+            // Only perform a restore if they exist
+            if (snapshotFound)
+            {
+                // A restore is a more complex operation that needs to run first against the target database
+                // to get the database to restore. Then the result of that needs to run against the mater database
+
+                // Step 1: Obtain the correct script by running intial script against target database
+                var resultScript = this.Execute(new ScriptDetail { Command = script, OutParameters = new { SqlCmd = DbType.String } });
+
+                // Step 2: Execute against the master database
+                var engine = new Script().Database(this.ConnectionString).UsingMaster()
+                    .UsingCommand(resultScript[0].Value as string)
+                    .Execute();
+            }
+
+            return snapshotFound;
+        }
+
+        void PerformDeleteSnapshot()
+        {
+            var snapShotScript = "SnapshotSQL.DeleteSnapshot.sql";
+            var script = this.LoadScript(snapShotScript, false, this.GetType().Assembly);
+            if (this.RestoreExistingSnapshot)
+            {
+                // Requesting a restore first will remove any data from the working copy prior to deleting the snapshot
+                // this has the effect of making the snapshot the active database again.
+                this.PerformRestoreSnapshot();
+            }
+
+            this.Execute(new ScriptDetail {Command = script});
+        }
+
         private void ResetState()
         {
             this.SelectedSnapshotMode = SnapshotMode.None;
-
         }
 
         private FieldList Execute(ScriptDetail scriptDetail)
