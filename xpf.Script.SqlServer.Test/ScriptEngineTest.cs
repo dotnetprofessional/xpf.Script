@@ -90,6 +90,23 @@ namespace xpf.Scripting.SqlServer.Test
         }
 
         [TestMethod]
+        public void When_taking_a_snapshot_and_providing_a_connection_string()
+        {
+            new Script()
+              .Database().WithConnectionString("Data Source=.;Initial Catalog=xpfScript;Trusted_Connection=yes;")
+              .TakeSnapshot()
+              .Execute();
+
+            // Assert
+            var actual = new Script().Database()
+                .UsingCommand("SELECT @Count = Count(*) FROM sys.databases sd WHERE sd.source_database_id = db_id()")
+                .WithOut(new { Count = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(1, actual.Property.Count);
+        }
+
+        [TestMethod]
         public void When_restoring_a_snapshot_any_changes_are_rolled_back()
         {
             new Script()

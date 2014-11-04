@@ -167,7 +167,7 @@ namespace xpf.Scripting.SQLServer
 
 
             // First we need to determine if there are any existing snapshots to restore, attempting to restore without snapshots will result in an exception
-            var scriptCount = new Script().Database(this.ConnectionString)
+            var scriptCount = new Script().Database().WithConnectionString(this.ConnectionString)
                 .UsingCommand("SELECT @Count = Count(*) FROM sys.databases sd WHERE sd.source_database_id = db_id()")
                 .WithOut(new { Count = DbType.Int32 })
                 .Execute();
@@ -183,7 +183,7 @@ namespace xpf.Scripting.SQLServer
                 var resultScript = this.Execute(new ScriptDetail { Command = script, OutParameters = new { SqlCmd = DbType.String } });
 
                 // Step 2: Execute against the master database
-                var engine = new Script().Database(this.ConnectionString).UsingMaster()
+                var engine = new Script().Database().WithConnectionString(this.ConnectionString).UsingMaster()
                     .UsingCommand(resultScript[0].Value as string)
                     .Execute();
             }
