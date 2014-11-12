@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.Common;
 using System.Data.SqlClient;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Transactions;
 using Microsoft.Practices.EnterpriseLibrary.Data;
@@ -215,7 +216,7 @@ namespace xpf.Scripting.SQLServer
 
             var dataAccess = GetDatabase();
 
-            string executionScript = scriptDetail.Command;
+            string executionScript = this.StripComments(scriptDetail.Command);
 
             var c = dataAccess.GetSqlStringCommand(executionScript);
             if (this.Timeout != 0) c.CommandTimeout = Timeout;
@@ -273,7 +274,7 @@ namespace xpf.Scripting.SQLServer
             var scriptDetail = this.scriptsToExecute[0];
             string executionScript = scriptDetail.Command;
 
-            c = dataAccess.GetSqlStringCommand(executionScript);
+            c = dataAccess.GetSqlStringCommand(this.StripComments(executionScript));
             if (this.Timeout != 0) c.CommandTimeout = Timeout;
 
             // Define the input parameters
@@ -337,6 +338,19 @@ namespace xpf.Scripting.SQLServer
                 dataAccess = factory.Create(this.DatabaseName);
 
             return dataAccess;
+        }
+
+        public string StripComments(string s)
+        {
+            string blockComments = @"/\*(?:(?:.|\n)*?)\*/";
+            string lineComments = @"(--(?:.*?)\r?\n)";
+            string emptyLinesAndSpaces = @"$((?:\s)*)";
+
+            Regex myRegex = new Regex(string.Format("{0}|{1}", blockComments, lineComments), RegexOptions.None);
+            var result = myRegex.Replace(s, Environment.NewLine);
+
+            myRegex = new Regex(emptyLinesAndSpaces, RegexOptions.Multiline);
+            return myRegex.Replace(result, Environment.NewLine);
         }
     }
 }
