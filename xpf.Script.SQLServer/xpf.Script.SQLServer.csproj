@@ -61,8 +61,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Web.config.transform" />
-    <None Include="app.config.transform" />
     <None Include="packages.config">
       <SubType>Designer</SubType>
     </None>

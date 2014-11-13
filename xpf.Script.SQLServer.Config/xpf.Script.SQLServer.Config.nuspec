@@ -1,18 +1,21 @@
 <?xml version="1.0"?>
 <package >
   <metadata>
-    <id>$id$</id>
-    <version>$version$</version>
-    <title>$title$</title>
+    <id>xpf.Script.SQLServer.Config</id>
+    <version>0.1.0.0</version>
+    <title>xpf.Script.SQLServer.Config</title>
     <authors>Garry McGlennon</authors>
     <owners>dotNetProfessional</owners>
     <licenseUrl>https://github.com/dotnetprofessional/xpf.Script/blob/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/dotnetprofessional/xpf.Script/wiki/SQLServer</projectUrl>
     <!--<iconUrl>http://ICON_URL_HERE_OR_DELETE_THIS_LINE</iconUrl>-->
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>$description$</description>
+    <description>Adds the required configuration entry to the existing App.Config or Web.Config or creates one if none exists. This should be run against any project that requires a configuration such as a test project, web project or console app. It is not required for referenced class library projects.</description>
     <releaseNotes>see https://github.com/dotnetprofessional/xpf.Script/releases </releaseNotes>
     <copyright>Copyright 2014</copyright>
-    <tags>Scripting xpf.Script SQLServer SQL TDD BDD integration testing dynamic sql</tags>
+    <tags>Scripting xpf.Script SQLServer SQL TDD BDD integration testing dynamic sql config</tags>
   </metadata>
+  <files>
+    <file src="*.transform" target="content\" />
+  </files>
 </package>
