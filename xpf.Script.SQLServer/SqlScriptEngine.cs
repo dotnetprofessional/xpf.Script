@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Transactions;
+using System.Windows.Input;
 using Microsoft.Practices.EnterpriseLibrary.Data;
 
 namespace xpf.Scripting.SQLServer
@@ -211,53 +212,64 @@ namespace xpf.Scripting.SQLServer
             this.SelectedSnapshotMode = SnapshotMode.None;
         }
 
-        private FieldList Execute(ScriptDetail scriptDetail)
+        FieldList Execute(ScriptDetail scriptDetail)
         {
-
-            var dataAccess = GetDatabase();
-
-            string executionScript = this.StripComments(scriptDetail.Command);
-
-            var c = dataAccess.GetSqlStringCommand(executionScript);
-            if (this.Timeout != 0) c.CommandTimeout = Timeout;
-
-            if (scriptDetail.OutParameters != null)
+            DbCommand c = null;
+            try
             {
-                if (scriptDetail.OutParameters is string[])
+
+
+                var dataAccess = GetDatabase();
+
+                string executionScript = this.StripComments(scriptDetail.Command);
+
+                c = dataAccess.GetSqlStringCommand(executionScript);
+                if (this.Timeout != 0) c.CommandTimeout = Timeout;
+
+                if (scriptDetail.OutParameters != null)
                 {
-                    foreach (var p in (IEnumerable<string>)scriptDetail.OutParameters)
+                    if (scriptDetail.OutParameters is string[])
                     {
-                        dataAccess.AddOutParameter(c, "@" + p, DbType.Object, int.MaxValue);
+                        foreach (var p in (IEnumerable<string>) scriptDetail.OutParameters)
+                        {
+                            dataAccess.AddOutParameter(c, "@" + p, DbType.Object, int.MaxValue);
+                        }
                     }
+
+                    else
+                    {
+                        var properties = scriptDetail.OutParameters.GetType().GetProperties();
+                        foreach (var p in properties)
+                        {
+                            dataAccess.AddOutParameter(c, "@" + p.Name, (DbType) p.GetValue(scriptDetail.OutParameters, null), int.MaxValue);
+                        }
+                    }
+
                 }
 
-                else
+                if (scriptDetail.InParameters != null)
                 {
-                    var properties = scriptDetail.OutParameters.GetType().GetProperties();
+                    var properties = scriptDetail.InParameters.GetType().GetProperties();
                     foreach (var p in properties)
                     {
-                        dataAccess.AddOutParameter(c, "@" + p.Name, (DbType)p.GetValue(scriptDetail.OutParameters, null), int.MaxValue);
+                        dataAccess.AddInParameter(c, "@" + p.Name, ConvertToSqlType(p.PropertyType), p.GetValue(scriptDetail.InParameters, null));
                     }
                 }
 
-            }
+                dataAccess.ExecuteNonQuery(c);
 
-            if (scriptDetail.InParameters != null)
+                var values = new FieldList();
+                foreach (DbParameter p in c.Parameters)
+                    values.Add(new Field(p.ParameterName.Substring(1), p.Value));
+
+                return values;
+            }
+            catch (SqlException ex)
             {
-                var properties = scriptDetail.InParameters.GetType().GetProperties();
-                foreach (var p in properties)
-                {
-                    dataAccess.AddInParameter(c, "@" + p.Name, ConvertToSqlType(p.PropertyType), p.GetValue(scriptDetail.InParameters, null));
-                }
+                // To make diagnosics easier add some important details to the exception
+                throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
+                    this.ConnectionString, c.CommandText), ex);
             }
-
-            dataAccess.ExecuteNonQuery(c);
-
-            var values = new FieldList();
-            foreach(DbParameter p in c.Parameters)
-                values.Add(new Field(p.ParameterName.Substring(1), p.Value));
-
-            return values;
         }
 
         public ReaderResult ExecuteReader()

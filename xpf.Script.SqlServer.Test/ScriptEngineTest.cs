@@ -8,6 +8,7 @@ using System.Windows.Markup;
 using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using xpf.Scripting;
+using xpf.Scripting.SQLServer;
 
 namespace xpf.Scripting.SqlServer.Test
 {
@@ -204,6 +205,17 @@ namespace xpf.Scripting.SqlServer.Test
                 .Database()
                 .DeleteSnapshot()
                 .Execute();
+        }
+
+        [TestMethod]
+        public void When_calling_Execute_that_fails_a_SqlScriptException_is_thrown()
+        {
+            Action action = () => new Script()
+                .Database().WithConnectionString("Data Source=Unknown;Initial Catalog=xpfScript;Trusted_Connection=yes;")
+                .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
+                .Execute();
+
+            action.ShouldThrow<SqlScriptException>().Which.Message.Should().Contain("Data Source=Unknown").And.Contain("SELECT * FROM TABLE");
         }
     }
 }

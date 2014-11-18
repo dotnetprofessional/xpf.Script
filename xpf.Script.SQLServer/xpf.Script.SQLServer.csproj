@@ -59,6 +59,7 @@
     <Compile Include="SqlDatabase.cs" />
     <Compile Include="SqlScriptEngine.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SQLScriptException.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config">
