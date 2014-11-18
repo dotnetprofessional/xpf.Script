@@ -65,6 +65,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="DataTypeCheckTable.cs" />
     <Compile Include="ScriptEngineTest.cs" />
     <Compile Include="TestTable.cs" />
     <Compile Include="ScriptTest.cs" />

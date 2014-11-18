@@ -298,6 +298,26 @@ namespace xpf.IO.Test
         }
 
         [TestMethod]
+        public void ExecuteReader_ToInstance_WithNullableTypes()
+        {
+            string script = "SELECT * FROM DataTypeCheckTable";
+
+            var result = new Script()
+                .Database()
+                .UsingCommand(script)
+                .ExecuteReader()
+                .ToInstance<DataTypeCheckTable>();
+
+            Assert.AreEqual(2, result.Count);
+            Assert.IsNotNull(result[0].NonNullDateTime);
+            Assert.IsNotNull(result[0].NonNullNumeric);
+            Assert.IsNotNull(result[0].NonNullString);
+            Assert.IsNull(result[0].NullableDateTime);
+            Assert.IsNull(result[0].NullableNumeric);
+            Assert.IsNull(result[0].NullableString);
+        }
+
+        [TestMethod]
         public void Execute_allows_multiple_scripts_to_be_executed()
         {
 

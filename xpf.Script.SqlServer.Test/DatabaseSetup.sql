@@ -6,7 +6,7 @@
 
 CREATE DATABASE xpfScript
 Go
-USE xpfScript
+USE xpfIOScript
 GO
 /****** Object:  Table [dbo].[TestTable]    Script Date: 06/18/2009 14:18:42 ******/
 SET ANSI_NULLS ON
@@ -52,3 +52,30 @@ INSERT INTO TestTable
 		([Id], Field1 ,[Field2] ,[Field3])
      VALUES
 		(3, 'Record 3', '2009-06-17 14:51:16.423', CAST('C9E2593E-E131-4E7F-91C1-9A6A85CC5333' AS UNIQUEIDENTIFIER))				
+
+-- Table used to test transforming data to class instances
+CREATE TABLE [dbo].[DataTypeCheckTable](
+	[Id] [int] IDENTITY(1,1) NOT NULL,
+	[NonNullString] [varchar](50) NOT NULL,
+	[NullableString] [varbinary](50) NULL,
+	[NonNullNumeric] [int] NOT NULL,
+	[NullableNumeric] [int] NULL,
+	[NonNullDateTime] [datetime] NOT NULL,
+	[NullableDateTime] [datetime] NULL,
+ CONSTRAINT [PK_DataTypeCheckTable] PRIMARY KEY CLUSTERED 
+(
+	[id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+INSERT INTO DataTypeCheckTable
+		(NonNullString, NullableString, NonNullNumeric, NullableNumeric, NonNullDateTime, NullableDateTime)
+	VALUES
+		('Some Text', null, 100, null, '2011-01-01', null)
+
+INSERT INTO DataTypeCheckTable
+		(NonNullString, NullableString, NonNullNumeric, NullableNumeric, NonNullDateTime, NullableDateTime)
+	VALUES
+		('Some Text 2', null, 200, null, '2011-01-02', null)

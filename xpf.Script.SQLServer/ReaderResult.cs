@@ -83,7 +83,15 @@ namespace xpf.Scripting.SQLServer
                     var entity = Activator.CreateInstance<T>();
                     for (int i = 0; i < dr.FieldCount; i++)
                     {
-                        entity.GetType().GetProperty(dr.GetName(i)).SetValue(entity, dr[i], null);
+                        var property = entity.GetType().GetProperty(dr.GetName(i));
+                        if (property == null)
+                            throw new KeyNotFoundException(string.Format("Expected property {0} on entity which doesn't exist.", dr.GetName(i)));
+
+                        var value = dr[i];
+                        if (value == DBNull.Value)
+                            property.SetValue(entity, null, null);
+                        else
+                            property.SetValue(entity, value, null);
                     }
 
                     result.Add(entity);
