@@ -55,13 +55,13 @@ BEGIN TRY
   /**************************************
   * Start SQL command
   **************************************/
-  SET @SqlCmd = '-- Switch database to Single User to drop all other users.'  + @nl
-              + 'ALTER DATABASE [' + @DatabaseName + ']'                      + @nl
+  -- Switch database to Single User to drop all other users.
+  SET @SqlCmd = 'ALTER DATABASE [' + @DatabaseName + ']'                      + @nl
               + 'SET SINGLE_USER WITH ROLLBACK IMMEDIATE;'                    + @nl
 
   -- Build Command to load using Snapshot. If it fails drop the Snapshot and do database Restore
   SET @SqlCmd += 'BEGIN TRY'                                                         + @nl
-               + '  -- Do Restore'                                                   + @nl
+				 -- Do Restore
                + '  RESTORE DATABASE ' + quotename( @DatabaseName )                  + @nl
                + '  FROM DATABASE_SNAPSHOT = ''' + @SnapShotName + ''';'             + @nl
                + @nl
@@ -69,12 +69,12 @@ BEGIN TRY
                + 'END TRY'                                                           + @nl 
                + 'BEGIN CATCH'                                                       + @nl
                + '  PRINT ''Database restored from Snapshot ' + @SnapshotName + ' Failed''' + @nl
-               + '  -- Drop Snapshot'                                                + @nl
+			   -- Drop Snapshot
                + '  DROP DATABASE ' + quotename( @SnapShotName ) + ';'               + @nl
                + 'END CATCH'                                                         + @nl
 
-  SET @SqlCmd += '-- Switch database to Multi User to drop all other users.'  + @nl
-              + 'ALTER DATABASE [' + @DatabaseName + ']'                      + @nl
+-- Switch database to Multi User to drop all other users.
+  SET @SqlCmd += 'ALTER DATABASE [' + @DatabaseName + ']'                      + @nl
               + 'SET MULTI_USER;'                                             + @nl
 
   /**************************************

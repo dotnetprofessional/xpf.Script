@@ -5,6 +5,7 @@ using System.Data.SqlClient;
 using System.Transactions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using xpf.Scripting;
+using xpf.Scripting.SQLServer;
 
 namespace xpf.IO.Test
 {
@@ -411,9 +412,9 @@ namespace xpf.IO.Test
                 
                 Assert.Fail("A timeout excepetion should have been raised");
             }
-            catch (SqlException ex)
+            catch (SqlScriptException ex)
             {
-                Assert.AreEqual("Timeout expired.  The timeout period elapsed prior to completion of the operation or the server is not responding.", ex.Message);
+                Assert.AreEqual("Timeout expired.  The timeout period elapsed prior to completion of the operation or the server is not responding.", ex.InnerException.Message);
             }
         }
 
