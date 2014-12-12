@@ -211,11 +211,12 @@ namespace xpf.Scripting.SqlServer.Test
         public void When_calling_Execute_that_fails_a_SqlScriptException_is_thrown()
         {
             Action action = () => new Script()
-                .Database().WithConnectionString("Data Source=Unknown;Initial Catalog=xpfScript;Trusted_Connection=yes;")
+                .Database().WithConnectionString("Data Source=.;Initial Catalog=xpfScript1;Trusted_Connection=yes;")
+                .WithTimeout(1)
                 .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
                 .Execute();
 
-            action.ShouldThrow<SqlScriptException>().Which.Message.Should().Contain("Data Source=Unknown").And.Contain("SELECT * FROM TABLE");
+            action.ShouldThrow<SqlScriptException>().Which.Message.Should().Contain("Data Source=.").And.Contain("SELECT * FROM TABLE");
         }
     }
 }

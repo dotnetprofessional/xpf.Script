@@ -50,6 +50,10 @@
     <Compile Include="Script.cs" />
     <Compile Include="ScriptDetail.cs" />
     <Compile Include="ScriptEngine.cs" />
+    <Compile Include="TraceEntry.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ChangeLog.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />

@@ -1,0 +1,13 @@
+﻿***************************************
+**  xpf.Script.SQLServer CHANGE LOG
+***************************************
+
+Version			Change
+0.1.0.0			Initial public release
+0.1.0.1			Bug#3: ReaderResult.Fields collection returning the same value for all fields
+0.1.0.2			Feature#1: Snapshot support for SQLDatabase
+0.1.0.7			Add connectionstring and command detail in Exceptions
+				Updating xpf.Script.SQLDatabase breaks working App.Config or Web.Config
+0.1.0.8			Bug#8: ExecuteReader.ToInstance() throws an exception if the resultset contains a null value
+0.1.0.9			Added support for Tracing based on v0.1.2 of xpf.Script
+				Minor changes to support .AppendCommand introduced to xpf.Script library 

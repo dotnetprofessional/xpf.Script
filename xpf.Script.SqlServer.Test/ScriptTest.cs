@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Transactions;
+using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using xpf.Scripting;
 using xpf.Scripting.SQLServer;
@@ -52,6 +53,34 @@ namespace xpf.IO.Test
         }
 
         [TestMethod]
+        public void Execute_SupportInParamsWithNullValues()
+        {
+            string nullValue = null;
+            var result = new Script()
+                .Database()
+                .UsingCommand("Select @OutParam1 = Id from TestTable where Id = 1 OR Id = @MyParam1")
+                .WithIn(new { MyParam1 = nullValue })
+                .WithOut(new { OutParam1 = DbType.Int32})
+                .Execute();
+
+            Assert.AreEqual(1, result.Property.OutParam1);
+        }
+
+        [TestMethod]
+        public void ExecuteReader_SupportInParamsWithNullValues()
+        {
+            string nullValue = null;
+            using (var result = new Script()
+                .Database()
+                .UsingCommand("Select * from TestTable where Id = 1")
+                .WithIn(new {MyParam1 = nullValue})
+                .ExecuteReader())
+            {
+                result.Should().NotBeNull();
+            }
+        }
+        
+        [TestMethod]
         public void Execute_ScriptNameOnly()
         {
             using (var x = new TransactionScope())
@@ -73,6 +102,138 @@ namespace xpf.IO.Test
 
                 Assert.AreEqual("Record X", result.Property.OutParam2);
             }
+        }
+
+        [TestMethod]
+        public void ExecuteReader_ScriptNameWithAppendCommand()
+        {
+            var count = 0;
+                // Execute an update on the table
+            using (var script = new Script()
+                .Database()
+                .UsingScript("ExecuteReader_SelectAll.sql").AppendCommand("WHERE Id = 1")
+                .ExecuteReader())
+            {
+                while (script.NextRecord())
+                {
+                    count++;
+                }
+            }
+
+            // The Where clause added should restrict the result to a single record
+            count.Should().Be(1);
+        }
+
+        [TestMethod]
+        public void ExecuteReader_ScriptNameWithMultipleAppendCommands()
+        {
+            var count = 0;
+            // Execute an update on the table
+            using (var script = new Script()
+                .Database()
+                .UsingScript("ExecuteReader_SelectAll.sql").AppendCommand("WHERE Id = 1").AppendCommand("OR Id = 2").AppendCommand("OR Id=3")
+                .ExecuteReader())
+            {
+                while (script.NextRecord())
+                {
+                    count++;
+                }
+            }
+
+            // The Where clause added should restrict the result to a single record
+            count.Should().Be(3);
+        }
+
+        [TestMethod]
+        public void ExecuteReader_ScriptNameWithMultipleAppendCommandsWithFormattingDisabled()
+        {
+            var count = 0;
+            // Execute an update on the table
+            using (var script = new Script()
+                .Database()
+                .UsingScript("ExecuteReader_SelectAll.sql").AppendCommand(" WHERE Field1='").AppendCommand("Record 1").AppendCommand("'").DisableAppendFormatting
+                .ExecuteReader())
+            {
+                while (script.NextRecord())
+                {
+                    count++;
+                }
+            }
+
+            // The Where clause added should restrict the result to a single record
+            count.Should().Be(1);
+        }
+
+
+
+        [TestMethod]
+        public void Execute_ScriptNameWithAppendCommand()
+        {
+            var count = 0;
+            // Execute an update on the table
+            var script = new Script()
+                .Database()
+                .UsingScript(GetTestTableRecordScript).AppendCommand("OR Id = 1")
+                .WithIn(new {Param1 = 200}) // Key doesn't exist
+                .WithOut(new {outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString})
+                .Execute();
+
+            // The Where clause added should restrict the result to a single record
+            Assert.AreEqual(1, script.Properties["outParam1"].Value);
+        }
+
+        [TestMethod]
+        public void Execute_ScriptNameWithMultipleAppendCommands()
+        {
+            var script = new Script()
+               .Database()
+               .UsingScript(GetTestTableRecordScript).AppendCommand("OR Id = 1").AppendCommand("OR Id = 201")
+               .WithIn(new { Param1 = 200 }) // Key doesn't exist
+               .WithOut(new { outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString })
+               .Execute();
+
+            // The Where clause added should restrict the result to a single record
+            Assert.AreEqual(1, script.Properties["outParam1"].Value);
+        }
+
+        [TestMethod]
+        public void Execute_ScriptNameWithMultipleAppendCommandsWithFormattingDisabled()
+        {
+            var script = new Script()
+               .Database()
+               .UsingScript(GetTestTableRecordScript).AppendCommand(" OR Field1='").AppendCommand("Record 2").AppendCommand("'").DisableAppendFormatting
+               .WithIn(new { Param1 = 200 }) // Key doesn't exist
+               .WithOut(new { outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString })
+               .Execute();
+
+            // The Where clause added should restrict the result to a single record
+            Assert.AreEqual(2, script.Properties["outParam1"].Value);
+        }
+
+        [TestMethod]
+        public void Execute_CommandWithMultipleAppendCommandsWithFormattingDisabled()
+        {
+            var script = new Script()
+               .Database()
+               .UsingCommand("SELECT @Count = COUNT(1) FROM TestTable").AppendCommand(" WHERE Field1='").AppendCommand("Record 1").AppendCommand("'").DisableAppendFormatting
+               .WithOut(new { Count = DbType.Int32})
+               .Execute();
+
+            // The Where clause added should restrict the result to a single record
+            Assert.AreEqual(1, script.Properties["Count"].Value);
+        }
+
+        [TestMethod]
+        public void Execute_CommandWithMultipleAppendCommands()
+        {
+            var script = new Script()
+               .Database()
+               .UsingCommand("SELECT @Count = COUNT(1) FROM TestTable").AppendCommand("WHERE Id = 1").AppendCommand("OR Id = 2").AppendCommand("OR Id=3")
+               .WithOut(new { Count = DbType.Int32 })
+               .Execute();
+
+            // The Where clause added should restrict the result to a single record
+            Assert.AreEqual(3, script.Properties["Count"].Value);
         }
 
         [TestMethod]
@@ -433,9 +594,9 @@ namespace xpf.IO.Test
 
                 Assert.Fail("A timeout excepetion should have been raised");
             }
-            catch (SqlException ex)
+            catch (SqlScriptException ex)
             {
-                Assert.AreEqual("Timeout expired.  The timeout period elapsed prior to completion of the operation or the server is not responding.", ex.Message);
+                ex.InnerException.Message.Should().Be("Timeout expired.  The timeout period elapsed prior to completion of the operation or the server is not responding.");
             }
         }
 

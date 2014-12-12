@@ -4,7 +4,9 @@ using System.Data;
 using System.Data.Common;
 using System.Data.SqlClient;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 using System.Windows.Input;
@@ -207,8 +209,9 @@ namespace xpf.Scripting.SQLServer
             this.Execute(new ScriptDetail {Command = script});
         }
 
-        private void ResetState()
+        protected override void ResetState()
         {
+            base.ResetState();
             this.SelectedSnapshotMode = SnapshotMode.None;
         }
 
@@ -262,10 +265,20 @@ namespace xpf.Scripting.SQLServer
                 foreach (DbParameter p in c.Parameters)
                     values.Add(new Field(p.ParameterName.Substring(1), p.Value));
 
+                if (Script.Tracing.IsTracingEnabled)
+                {
+                    var result = new Result();
+                    result.AddResult(values);
+                    Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, result);
+                }
+
                 return values;
             }
             catch (SqlException ex)
             {
+                if(Script.Tracing.IsTracingEnabled)
+                    Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
+
                 // To make diagnosics easier add some important details to the exception
                 throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
                     this.ConnectionString, c.CommandText), ex);
@@ -274,32 +287,50 @@ namespace xpf.Scripting.SQLServer
 
         public ReaderResult ExecuteReader()
         {
-            base.Execute();
-
-            if(this.EnableParallelExecutionProperty)
-                throw new ArgumentException("Parallel execution is not supported for ExecuteReader.");
-
-            var dataAccess = GetDatabase();
-
-            DbCommand c;
-
-            var scriptDetail = this.scriptsToExecute[0];
-            string executionScript = scriptDetail.Command;
-
-            c = dataAccess.GetSqlStringCommand(this.StripComments(executionScript));
-            if (this.Timeout != 0) c.CommandTimeout = Timeout;
-
-            // Define the input parameters
-            if (scriptDetail.InParameters != null)
+            ScriptDetail scriptDetail = null;
+            DbCommand c = null;
+            try
             {
-                var properties = scriptDetail.InParameters.GetType().GetProperties();
-                foreach (var p in properties)
-                {
-                    dataAccess.AddInParameter(c, "@" + p.Name, ConvertToSqlType(p.PropertyType), p.GetValue(scriptDetail.InParameters, null));
-                }
-            }
+                base.Execute();
 
-            return new ReaderResult(dataAccess.ExecuteReader(c));
+                if (this.EnableParallelExecutionProperty)
+                    throw new ArgumentException("Parallel execution is not supported for ExecuteReader.");
+
+                var dataAccess = GetDatabase();
+
+                scriptDetail = this.scriptsToExecute[0];
+                string executionScript = scriptDetail.Command;
+
+                c = dataAccess.GetSqlStringCommand(this.StripComments(executionScript));
+                if (this.Timeout != 0) c.CommandTimeout = Timeout;
+
+                // Define the input parameters
+                if (scriptDetail.InParameters != null)
+                {
+                    var properties = scriptDetail.InParameters.GetType().GetProperties();
+                    foreach (var p in properties)
+                    {
+                        dataAccess.AddInParameter(c, "@" + p.Name, ConvertToSqlType(p.PropertyType), p.GetValue(scriptDetail.InParameters, null));
+                    }
+                }
+
+                var dataReader = dataAccess.ExecuteReader(c);
+
+                if (Script.Tracing.IsTracingEnabled)
+                    Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null);
+
+                this.ResetState();
+                return new ReaderResult(dataReader);
+            }
+            catch (SqlException ex)
+            {
+                if (Script.Tracing.IsTracingEnabled)
+                    Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
+
+                // To make diagnosics easier add some important details to the exception
+                throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
+                    this.ConnectionString, c.CommandText), ex);
+            }
         }
 
         public SqlScriptEngine UseCataglog(string catalongName)
@@ -364,5 +395,7 @@ namespace xpf.Scripting.SQLServer
             myRegex = new Regex(emptyLinesAndSpaces, RegexOptions.Multiline);
             return myRegex.Replace(result, Environment.NewLine);
         }
+
+        
     }
 }

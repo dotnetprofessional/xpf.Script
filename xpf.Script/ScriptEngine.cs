@@ -17,6 +17,9 @@ namespace xpf.Scripting
 
         protected bool EnableValidationsProperty { get; set; }
 
+        protected List<string> CommandToAppend = new List<string>();
+        bool _disableAppendFormatting;
+
         protected ScriptEngine()
         {
             // This is a bit of a hack due to an issue of exposing GetCallingAssembly in a PCL
@@ -52,6 +55,41 @@ namespace xpf.Scripting
         {
             var script = this.LoadScript(scriptName, false);
             return this.UsingCommand(script);
+        }
+
+        public T AppendCommand(string commandText)
+        {
+            this.CommandToAppend.Add(commandText);
+            return (T)(object)this;
+        }
+
+        public T DisableAppendFormatting
+        {
+            get
+            {
+                _disableAppendFormatting = true;
+                return (T)(object)this;
+            }
+        }
+
+        void ApplyAppendedScriptsToActiveScript()
+        {
+            // Check that we have any commands to append
+            if (this.CommandToAppend.Count == 0)
+                return;
+
+            var scriptFormattingPrefix = "";
+
+            var scriptToAppend = "";
+            if (!_disableAppendFormatting)
+                scriptFormattingPrefix = Environment.NewLine;
+
+            scriptToAppend = scriptFormattingPrefix + string.Join(scriptFormattingPrefix, this.CommandToAppend);
+
+            this.activeScript.Command += scriptToAppend;
+
+            // Clear out the append scripts
+            this.CommandToAppend.Clear();
         }
 
         /// <summary>
@@ -92,6 +130,7 @@ namespace xpf.Scripting
         {
             if (this.activeScript != null)
             {
+                this.ApplyAppendedScriptsToActiveScript();
                 this.scriptsToExecute.Add(this.activeScript);
             }
 
@@ -129,13 +168,16 @@ namespace xpf.Scripting
         public virtual Result Execute()
         {
             // add the currently active script to the list
-            if(this.activeScript != null)
+            if (this.activeScript != null)
+            {
+                this.ApplyAppendedScriptsToActiveScript();
                 this.scriptsToExecute.Add(this.activeScript);
+            }
 
+            // Perform some validations on the script
             if (this.EnableValidationsProperty)
                 this.ValidateScript();
 
-            // Perform some validations on the 
             // this is never used as this is an abstract class
             return null;
         }
@@ -208,6 +250,11 @@ namespace xpf.Scripting
             {
                 return embeddedScript;
             }
+        }
+
+        protected virtual void ResetState()
+        {
+            this.CommandToAppend.Clear();
         }
     }
 }
