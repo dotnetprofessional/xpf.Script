@@ -1,13 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Markup;
 using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using xpf.Scripting;
 using xpf.Scripting.SQLServer;
 
 namespace xpf.Scripting.SqlServer.Test

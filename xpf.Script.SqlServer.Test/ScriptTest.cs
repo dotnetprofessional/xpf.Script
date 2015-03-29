@@ -169,7 +169,6 @@ namespace xpf.IO.Test
         [TestMethod]
         public void Execute_ScriptNameWithAppendCommand()
         {
-            var count = 0;
             // Execute an update on the table
             var script = new Script()
                 .Database()

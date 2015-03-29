@@ -54,6 +54,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IdentityMap.cs" />
+    <Compile Include="IPersistType.cs" />
     <Compile Include="ReaderResult.cs" />
     <Compile Include="ReaderResultField.cs" />
     <Compile Include="SqlDatabase.cs" />

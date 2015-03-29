@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Data.SqlClient;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -173,7 +175,7 @@ namespace xpf.Scripting.SQLServer
             // First we need to determine if there are any existing snapshots to restore, attempting to restore without snapshots will result in an exception
             var scriptCount = new Script().Database().WithConnectionString(this.ConnectionString)
                 .UsingCommand("SELECT @Count = Count(*) FROM sys.databases sd WHERE sd.source_database_id = db_id()")
-                .WithOut(new { Count = DbType.Int32 })
+                .WithOut(new {Count = DbType.Int32})
                 .Execute();
 
             bool snapshotFound = scriptCount.Property.Count != 0;
@@ -184,7 +186,7 @@ namespace xpf.Scripting.SQLServer
                 // to get the database to restore. Then the result of that needs to run against the mater database
 
                 // Step 1: Obtain the correct script by running intial script against target database
-                var resultScript = this.Execute(new ScriptDetail { Command = script, OutParameters = new { SqlCmd = DbType.String } });
+                var resultScript = this.Execute(new ScriptDetail {Command = script, OutParameters = new {SqlCmd = DbType.String}});
 
                 // Step 2: Execute against the master database
                 var engine = new Script().Database().WithConnectionString(this.ConnectionString).UsingMaster()
@@ -276,7 +278,7 @@ namespace xpf.Scripting.SQLServer
             }
             catch (SqlException ex)
             {
-                if(Script.Tracing.IsTracingEnabled)
+                if (Script.Tracing.IsTracingEnabled)
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
 
                 // To make diagnosics easier add some important details to the exception
@@ -349,7 +351,7 @@ namespace xpf.Scripting.SQLServer
             return this.UseCataglog("master");
         }
 
-        private static DbType ConvertToSqlType(Type datatype)
+        static DbType ConvertToSqlType(Type datatype)
         {
             switch (datatype.Name)
             {
@@ -368,12 +370,13 @@ namespace xpf.Scripting.SQLServer
                     return DbType.String;
             }
         }
+
         Database GetDatabase()
         {
             var factory = new DatabaseProviderFactory();
             Database dataAccess;
 
-            if(this.ConnectionString != null)
+            if (this.ConnectionString != null)
                 dataAccess = new Microsoft.Practices.EnterpriseLibrary.Data.Sql.SqlDatabase(this.ConnectionString);
             else if (this.DatabaseName == null)
                 dataAccess = factory.CreateDefault();
@@ -383,7 +386,7 @@ namespace xpf.Scripting.SQLServer
             return dataAccess;
         }
 
-        public string StripComments(string s)
+        string StripComments(string s)
         {
             string blockComments = @"/\*(?:(?:.|\n)*?)\*/";
             string lineComments = @"(--(?:.*?)\r?\n)";
@@ -396,6 +399,80 @@ namespace xpf.Scripting.SQLServer
             return myRegex.Replace(result, Environment.NewLine);
         }
 
-        
+
+        public IdentityMap Persist(object entity, object handler)
+        {
+            if (this.EnableParallelExecutionProperty)
+                throw new ArgumentException("Parallel execution is not supported by the Persist method.");
+
+            // Find all the handlers for the entity types
+            this.RegisterEventHandlers(handler);
+
+            var persistenceMap = new IdentityMap();
+            if (typeof (IEnumerable).GetTypeInfo().IsInstanceOfType(entity))
+                this.PersistCollection(null, entity as IEnumerable, handler, persistenceMap);
+            else
+                this.PersistEntity(null, entity, handler, persistenceMap);
+
+            return persistenceMap;
+        }
+
+        void PersistCollection(object parent, IEnumerable entity, object handler, IdentityMap persistenceMap)
+        {
+            foreach (var item in entity)
+                if (typeof (IEnumerable).GetTypeInfo().IsInstanceOfType(item))
+                    this.PersistCollection(parent, item as IEnumerable, handler, persistenceMap);
+                else
+                    this.PersistEntity(parent, item, handler, persistenceMap);
+        }
+
+        void PersistEntity(object parent, object entity, object handler, IdentityMap persistenceMap)
+        {
+            // Locate the method fot this entity
+            var method = this.TypeHandlers[entity.GetType().FullName];
+            method.Invoke(handler, new object[] {parent, entity, persistenceMap});
+
+            foreach (PropertyInfo propertyInfo in entity.GetType().GetTypeInfo().DeclaredProperties)
+            {
+                var propertyType = propertyInfo.PropertyType;
+
+                // Strings inherit from IEnumerable so need to do a special test for it
+                if (propertyType.IsAssignableFrom(typeof (string)))
+                    continue;
+
+                // If the property is another collection then process as a collection
+                if (typeof (IEnumerable).GetTypeInfo().IsAssignableFrom(propertyType))
+                {
+                    var value = propertyInfo.GetValue(entity, null);
+                    this.PersistCollection(entity, value as IEnumerable, handler, persistenceMap);
+                } else if (propertyType.IsClass)
+                {
+                    var value = propertyInfo.GetValue(entity, null);
+                    this.PersistEntity(entity, value, handler, persistenceMap);
+                }
+
+            }
+        }
+
+        Dictionary<string, MethodInfo> TypeHandlers { get; set; }
+
+        void RegisterEventHandlers(object handler)
+        {
+            this.TypeHandlers = new Dictionary<string, MethodInfo>();
+
+            var interfaces = handler.GetType().GetInterfaces();
+
+            foreach (var impl in interfaces)
+            {
+                // Skip any interface that isn't the IPersistType
+                if (impl.Name != "IPersistType`1")
+                    continue;
+
+                var genericType = impl.GenericTypeArguments[0];
+                var method = impl.GetMethod("Persist");
+                this.TypeHandlers.Add(genericType.FullName, method);
+            }
+        }
+
     }
 }

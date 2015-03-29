@@ -66,6 +66,8 @@
   </Choose>
   <ItemGroup>
     <Compile Include="DataTypeCheckTable.cs" />
+    <Compile Include="Model\Customer.cs" />
+    <Compile Include="ScriptEnginePersistTest.cs" />
     <Compile Include="ScriptEngineTest.cs" />
     <Compile Include="TestTable.cs" />
     <Compile Include="ScriptTest.cs" />
