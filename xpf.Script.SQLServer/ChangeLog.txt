@@ -11,3 +11,5 @@ Version			Change
 0.1.0.8			Bug#8: ExecuteReader.ToInstance() throws an exception if the resultset contains a null value
 0.1.0.9			Added support for Tracing based on v0.1.2 of xpf.Script
 				Minor changes to support .AppendCommand introduced to xpf.Script library 
+0.1.1.0			?
+0.1.1.1			Added support for transient exceptions. Will now retry 3 times for a set of SQL exceptions known to be transient in nature.

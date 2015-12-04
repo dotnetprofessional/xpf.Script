@@ -316,7 +316,7 @@ namespace xpf.Scripting.SQLServer
                     }
                 }
 
-                var dataReader = dataAccess.ExecuteReader(c);
+                var dataReader = this.ExecuteWithRetry(() => dataAccess.ExecuteReader(c));
 
                 if (Script.Tracing.IsTracingEnabled)
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null);
@@ -474,5 +474,52 @@ namespace xpf.Scripting.SQLServer
             }
         }
 
+        T ExecuteWithRetry<T>(Func<T> codeToExecute)
+        {
+            var attempts = 1;
+            var retryAttempts = 3;
+            var shouldRetry = false;
+            do
+            {
+                try
+                {
+                    return codeToExecute();
+                }
+                    // Only worry about Sql Exceptions
+                catch (SqlException ex)
+                {
+                    switch (ex.Number)
+                    {
+                        case 1205: // Dead-lock
+                        case -2: // Timeout Expired
+                        case 64: // An error occurred during login
+                        case 233: //Connection initialization error. 
+                        case 10053: //A transport-level error occurred when receiving results from the server.
+                        case 10054: //A transport-level error occurred when receiving results from the server.
+                        case 10060: // Network or instance-specific error.  
+                        case 40143: //Connection could not be initialized.  
+                        case 40197: // The service encountered an error processing your request
+                        case 40501: // The server is busy.  
+                        case 40613: // The database is currently unavailable. 
+                        case 4060: // Cannot open database "%.*ls" requested by the login. The login failed. 
+                        case 10928: // The %s limit for the database is %d and has been reached
+                        case 10929: // The %s limit for the database is %d and has been reached
+                            // Validate if a retry should be performed
+                            shouldRetry = attempts <= retryAttempts;
+                            attempts++;
+
+                            // Put a small delay before attempting again
+                            if(shouldRetry)
+                                Thread.Sleep(500);
+                            break;
+                        default:
+                            throw;
+                    }
+
+                    if (!shouldRetry)
+                        throw;
+                }
+            } while (true);
+        }
     }
 }
