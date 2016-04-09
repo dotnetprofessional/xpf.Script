@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace xpf.Scripting
 {
@@ -42,7 +44,7 @@ namespace xpf.Scripting
         public T UsingAssembly(Assembly assembly)
         {
             this.ScriptAssembly = assembly;
-            return (T) (object) this;
+            return (T)(object)this;
         }
 
         public T UsingAssembly(object instance)
@@ -111,7 +113,7 @@ namespace xpf.Scripting
         public T EnableParallelExecution()
         {
             this.EnableParallelExecutionProperty = true;
-            return (T) (object) this;
+            return (T)(object)this;
         }
 
         /// <summary>
@@ -136,7 +138,7 @@ namespace xpf.Scripting
 
             this.activeScript = new ScriptDetail();
             this.activeScript.Command = commandText;
-            return (T)(object)this ;
+            return (T)(object)this;
         }
 
         public T WithIn(object inParameters)
@@ -144,8 +146,8 @@ namespace xpf.Scripting
             if (this.activeScript == null)
                 throw new ArgumentException("Unable to add parameters without specifying a script first.");
 
-            if(this.activeScript.InParameters != null)
-                throw new ArgumentException("Unable to sepcify WithIn multiple times for a single script. Try adding addition parameters to the first use of WithIn\r\nExample: .WithIn(new {Property1 = \"a\", Property2=\"b\"})");
+            if (this.activeScript.InParameters != null)
+                throw new ArgumentException("Unable to sepcify WithIn multiple times for a single script. Try adding additional parameters to the first use of WithIn\r\nExample: .WithIn(new {Property1 = \"a\", Property2=\"b\"})");
 
             this.activeScript.InParameters = inParameters;
 
@@ -158,11 +160,93 @@ namespace xpf.Scripting
                 throw new ArgumentException("Unable to add parameters without specifying a script first.");
 
             if (this.activeScript.OutParameters != null)
-                throw new ArgumentException("Unable to sepcify WithOut multiple times for a single script. Try adding addition parameters to the first use of WithOut\r\nExample: .WithOut(new {Property1 = \"a\", Property2=\"b\"})");
+                throw new ArgumentException("Unable to sepcify WithOut multiple times for a single script. Try adding additional parameters to the first use of WithOut\r\nExample: .WithOut(new {Property1 = \"a\", Property2=\"b\"})");
 
             this.activeScript.OutParameters = outParameters;
 
             return (T)(object)this;
+        }
+
+        public T Bind(object instance)
+        {
+            if (this.activeScript == null)
+                throw new ArgumentException("Unable to use bind without specifying a script first.");
+
+            if (instance == null)
+                throw new ArgumentException("Unable to sepcify Bind multiple times for a single script. Try adding additional properties to the object instance,\r\nExample: .Bind(new {Property1 = \"a\", Property2=\"b\"})");
+
+            var validationOutput = "";
+            var script = this.activeScript;
+            // As binding modifies the script immediately, validations are performed immediately too.
+            if (this.EnableValidationsProperty)
+            {
+                foreach (var p in instance.GetType().GetTypeInfo().DeclaredProperties)
+                {
+                    if (!script.Command.Contains(string.Format("{0}{1}{2}", "{#", p.Name, "}")) &&
+                        !script.Command.Contains(string.Format("{0}{1}{2}", "{!", p.Name, "}")))
+                        validationOutput += string.Format("Script number {0} is missing a reference to the bound parameter: {1}\r\n", this.scriptsToExecute.Count + 1, p.Name);
+                }
+
+                if (validationOutput != "")
+                    throw new KeyNotFoundException("The following errors were found processing the scripts:\r\n\r\n" + validationOutput);
+            }
+
+            this.BindActiveScript(instance);
+
+            return (T)(object)this;
+        }
+
+        void BindActiveScript(object instance)
+        {
+            Regex rx = new Regex(@"{(#|!)[\w\d\.]+}", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            var properties = instance.GetType().GetTypeInfo().DeclaredProperties;
+
+            string result = rx.Replace(this.activeScript.Command, (m) => this.Bind(m, properties, instance));
+            this.activeScript.Command = result;
+        }
+
+        string Bind(Match m, IEnumerable<PropertyInfo> properties, object instance)
+        {
+            var key = m.ToString();
+            // Remove braces
+            var  property = key.Substring(2, key.Length - 3);
+            var bindingType = key.Substring(1,1);
+
+            // Find key in resource manager for this culture
+            PropertyInfo value = properties.FirstOrDefault(p => p.Name == property);
+
+            if (value != null)
+            {
+                var textValue = value.GetValue(instance).ToString();
+                if(bindingType == "#")
+                    return SanitizeValue(textValue);
+                else
+                    return textValue;
+            }
+            else
+            {
+                return m.ToString();
+            }
+        }
+
+        static string SanitizeValue(string stringValue)
+        {
+            if (null == stringValue)
+                return stringValue;
+            return RegexReplace(RegexReplace(RegexReplace(stringValue,"-{2,}", "-"), // transforms multiple --- in - use to comment in sql scripts
+                        @"[*/]+", string.Empty),                                     // removes / and * used also to comment in sql scripts
+                        @"(;|\s)(exec|execute|select|insert|update|delete|create|alter|drop|rename|truncate|backup|restore|and|or|not)\s", string.Empty, RegexOptions.IgnoreCase);
+        }
+
+
+        private static string RegexReplace(string stringValue, string matchPattern, string toReplaceWith)
+        {
+            return Regex.Replace(stringValue, matchPattern, toReplaceWith);
+        }
+
+        private static string RegexReplace(string stringValue, string matchPattern, string toReplaceWith, RegexOptions regexOptions)
+        {
+            return Regex.Replace(stringValue, matchPattern, toReplaceWith, regexOptions);
         }
 
         public virtual Result Execute()
@@ -192,7 +276,7 @@ namespace xpf.Scripting
             var scriptNumberCount = 0;
             foreach (var s in this.scriptsToExecute)
             {
-                scriptNumberCount ++;
+                scriptNumberCount++;
                 // Validate all input parameters are being used by the script
                 if (s.InParameters != null)
                     foreach (var p in s.InParameters.GetType().GetTypeInfo().DeclaredProperties)
@@ -209,7 +293,7 @@ namespace xpf.Scripting
                     }
             }
 
-            if(validationOutput != "")
+            if (validationOutput != "")
                 throw new KeyNotFoundException("The following errors were found processing the scripts:\r\n\r\n" + validationOutput);
         }
 
@@ -224,28 +308,28 @@ namespace xpf.Scripting
             if (includeNested)
             {
 
-            // Convert to lines
-            var compositeScript = new StringBuilder();
-                var scriptLines = embeddedScript.Split(new[] {"\r", "\n"}, StringSplitOptions.None);
-            foreach (var line in scriptLines)
-            {
-                var trimmedLine = line.Trim();
-                if (trimmedLine.StartsWith("include") ||
-                    trimmedLine.StartsWith(":r"))
+                // Convert to lines
+                var compositeScript = new StringBuilder();
+                var scriptLines = embeddedScript.Split(new[] { "\r", "\n" }, StringSplitOptions.None);
+                foreach (var line in scriptLines)
                 {
-                    // Include the embedded script
-                    var includeScript = trimmedLine.Substring(trimmedLine.IndexOf(" ", System.StringComparison.Ordinal) + 1);
-                    // If the script name is using the :r syntax it might have a sub-path defined, if so need to convert to dot notation
-                    includeScript = includeScript.Replace(@"\", ".");
+                    var trimmedLine = line.Trim();
+                    if (trimmedLine.StartsWith("include") ||
+                        trimmedLine.StartsWith(":r"))
+                    {
+                        // Include the embedded script
+                        var includeScript = trimmedLine.Substring(trimmedLine.IndexOf(" ", System.StringComparison.Ordinal) + 1);
+                        // If the script name is using the :r syntax it might have a sub-path defined, if so need to convert to dot notation
+                        includeScript = includeScript.Replace(@"\", ".");
 
                         compositeScript.Append(this.LoadScript(includeScript, true));
+                    }
+                    else
+                        compositeScript.Append(line + "\r\n");
                 }
-                else
-                    compositeScript.Append(line + "\r\n");
-            }
 
-            return compositeScript.ToString();
-        }
+                return compositeScript.ToString();
+            }
             else
             {
                 return embeddedScript;
