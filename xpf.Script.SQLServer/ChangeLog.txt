@@ -13,3 +13,5 @@ Version			Change
 				Minor changes to support .AppendCommand introduced to xpf.Script library 
 0.1.1.0			?
 0.1.1.1			Added support for transient exceptions. Will now retry 3 times for a set of SQL exceptions known to be transient in nature.
+0.2.0.0			Feature#14: Add support for multi-record parameters
+				Feature#15: Add Async support

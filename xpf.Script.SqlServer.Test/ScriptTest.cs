@@ -234,6 +234,20 @@ namespace xpf.IO.Test
         }
 
         [TestMethod]
+        public void ExecuteAsync_ScriptNameWithAppendCommand()
+        {
+            // Execute an update on the table
+            var script = new Script()
+                .Database()
+                .UsingScript(GetTestTableRecordScript).AppendCommand("OR Id = 1")
+                .WithIn(new { Param1 = 200 }) // Key doesn't exist
+                .WithOut(new { outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString })
+                .ExecuteAsync().Result;
+
+            // The Where clause added should restrict the result to a single record
+            Assert.AreEqual(1, script.Properties["outParam1"].Value);
+        }
+        [TestMethod]
         public void Execute_ScriptNameWithMultipleAppendCommands()
         {
             var script = new Script()
@@ -332,7 +346,27 @@ namespace xpf.IO.Test
                 Assert.AreEqual(3, result.Property.RowCount);
             }
         }
+        [TestMethod]
+        public void ExecuteAsync_NestedScriptNameOnlyWithNestedInclude()
+        {
+            using (var x = new TransactionScope())
+            {
+                string embeddedScriptName = "Execute_IncludeScript.sql";
+                new Script()
+                    .Database()
+                    .UsingNestedScript(embeddedScriptName)
+                    .ExecuteAsync().Wait();
 
+                // Now verify that the update was successful
+                var result = new Script()
+                    .Database()
+                    .UsingCommand("SELECT @RowCount = COUNT(*) FROM TestTable WHERE Id >= 10")
+                    .WithOut(new { RowCount = DbType.Int32 })
+                    .ExecuteAsync().Result;
+
+                Assert.AreEqual(3, result.Property.RowCount);
+            }
+        }
         [TestMethod]
         public void Execute_NestedScriptNameOnlyWithNestedColonR()
         {
@@ -496,6 +530,20 @@ namespace xpf.IO.Test
 
             Assert.AreEqual(27, result.Count);
         }
+        [TestMethod]
+        public void ExecuteReaderAsync_FromXmlToInstance()
+        {
+            string embeddedScriptName = "ExecuteT_ScriptOnly.sql";
+
+            var dataReader = new Script()
+                .Database()
+                .UsingScript(embeddedScriptName)
+                .ExecuteReaderAsync().Result;
+
+            var result = dataReader.FromXmlToInstance<List<TestTable>>();
+
+            Assert.AreEqual(27, result.Count);
+        }
 
         [TestMethod]
         public void ExecuteReader_ToInstance()
@@ -506,6 +554,21 @@ namespace xpf.IO.Test
                 .Database()
                 .UsingScript(embeddedScriptName)
                 .ExecuteReader().ToInstance<TestTable>();
+
+            Assert.AreEqual(3, result.Count);
+        }
+
+        [TestMethod]
+        public void ExecuteReaderAsync_ToInstance()
+        {
+            string embeddedScriptName = "ExecuteReader_SelectAll.sql";
+
+            var dataReader = new Script()
+                .Database()
+                .UsingScript(embeddedScriptName)
+                .ExecuteReaderAsync().Result;
+
+            var result = dataReader.ToInstance<TestTable>();
 
             Assert.AreEqual(3, result.Count);
         }
