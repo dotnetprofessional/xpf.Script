@@ -21,7 +21,6 @@ namespace xpf.Scripting.SQLServer
             Restore,
             Delete
         }
-        protected int Timeout { get; set; }
 
         SnapshotMode SelectedSnapshotMode;
 
@@ -226,7 +225,7 @@ namespace xpf.Scripting.SQLServer
                 // A restore is a more complex operation that needs to run first against the target database
                 // to get the database to restore. Then the result of that needs to run against the mater database
 
-                // Step 1: Obtain the correct script by running intial script against target database
+                // Step 1: Obtain the correct script by running initial script against target database
                 var resultScript = this.Execute(new ScriptDetail { Command = script, OutParameters = new { SqlCmd = DbType.String } });
 
                 // Step 2: Execute against the master database
@@ -407,7 +406,6 @@ namespace xpf.Scripting.SQLServer
                     foreach (var p in (IEnumerable<string>)scriptDetail.OutParameters)
                     {
                         c.AddOutParameter("@" + p, SqlDbType.Variant);
-                        //dataAccess.AddOutParameter(c, "@" + p, DbType.Object, int.MaxValue);
                     }
                 }
 
@@ -417,7 +415,6 @@ namespace xpf.Scripting.SQLServer
                     foreach (var p in properties)
                     {
                         c.AddOutParameter("@" + p.Name, ConvertFromDbTypeToSqlType((DbType)p.GetValue(scriptDetail.OutParameters, null)));
-                        //dataAccess.AddOutParameter(c, "@" + p.Name, (DbType)p.GetValue(scriptDetail.OutParameters, null), int.MaxValue);
                     }
                 }
             }
@@ -428,8 +425,15 @@ namespace xpf.Scripting.SQLServer
                 foreach (var p in properties)
                 {
                     var dbType = ConvertToSqlType(p.PropertyType);
-                    c.AddInParameter("@" + p.Name, dbType, p.GetValue(scriptDetail.InParameters, null));
-                    //dataAccess.AddInParameter(c, "@" + p.Name, , p.GetValue(scriptDetail.InParameters, null));
+                    var value = p.GetValue(scriptDetail.InParameters, null);
+                    if (dbType == SqlDbType.Structured)
+                    {
+                        
+                        c.AddStructuredInParameter("@" + p.Name, dbType, value, $"{p.PropertyType.GenericTypeArguments[0].Name}Type");
+                    }
+                    else
+                        c.AddInParameter("@" + p.Name, dbType, value);
+
                 }
             }
 
@@ -493,7 +497,7 @@ namespace xpf.Scripting.SQLServer
             }
         }
 
-        static SqlDbType ConvertToSqlType(Type datatype)
+        internal static SqlDbType ConvertToSqlType(Type datatype)
         {
             switch (datatype.Name)
             {
@@ -509,8 +513,8 @@ namespace xpf.Scripting.SQLServer
                 case "Byte[]":
                     return SqlDbType.Binary;
                 case "String":
-                    return SqlDbType.NVarChar;
-                case "Class":
+                    return SqlDbType.Text;
+                case "List`1": // Need to add other IEnumerable types here
                     return SqlDbType.Structured;
                 default:
                     return SqlDbType.Variant;

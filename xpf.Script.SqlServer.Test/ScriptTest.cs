@@ -53,6 +53,29 @@ namespace xpf.IO.Test
         }
 
         [TestMethod]
+        public void Execute_SupportInParameterCollections()
+        {
+            string embeddedScriptName =
+                "DELETE FROM TestTable WHERE ID > 10" +
+                "INSERT INTO TestTable(Id, Field1, Field2, Field3) SELECT A.Id, A.Field1, A.Field2, A.Field3 FROM @TestTableValues AS A\r\n" +
+                "SELECT @Records = COUNT(1) FROM TestTable";
+
+            var rows = new List<TestTable>();
+            rows.Add(new TestTable { Id = 100, Field1 = "100", Field2 = DateTime.Now, Field3 = Guid.NewGuid() });
+            rows.Add(new TestTable { Id = 101, Field1 = "101", Field2 = DateTime.Now, Field3 = Guid.NewGuid() });
+            rows.Add(new TestTable { Id = 102, Field1 = "102", Field2 = DateTime.Now, Field3 = Guid.NewGuid() });
+
+            var result = new Script()
+                .Database()
+                .UsingCommand(embeddedScriptName)
+                .WithIn(new { TestTableValues = rows })
+                .WithOut(new {Records = DbType.Int32})
+                .Execute();
+
+            Assert.AreEqual(6, result.Property.Records);
+        }
+
+        [TestMethod]
         public void Execute_SupportInParamsWithNullValues()
         {
             string nullValue = null;
