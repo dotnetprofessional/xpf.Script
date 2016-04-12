@@ -116,7 +116,7 @@ namespace xpf.IO.Test
         }
 
         [TestMethod]
-        public void ExecuteReader_SupportBindWithOutSanitizationValues()
+        public void ExecuteReader_SupportBindWithoutSanitizationValues()
         {
             using (var result = new Script()
                 .Database()
@@ -431,6 +431,22 @@ namespace xpf.IO.Test
             Assert.AreEqual(2, result.Property.OutParam1);
         }
 
+
+        //[TestMethod]
+        //public void ExecuteReader_ScriptNameAndOutParmsAsStringArrayAndInParams()
+        //{
+        //    string embeddedScriptName = "ExecuteReader_SupportOutParams.sql";
+
+        //    // Testing the less recommended way of passing outparams as a simple string array
+        //    var result = new Script()
+        //        .Database()
+        //        .UsingScript(embeddedScriptName)
+        //        .WithIn(new { param1 = 2 })
+        //        .WithOut(new[] { "param2" })
+        //        .ExecuteReader();
+
+        //    Assert.AreEqual(100, result.Property.Param2);
+        //}
 
         [TestMethod]
         public void ExecuteReader_ScriptNameOnly()

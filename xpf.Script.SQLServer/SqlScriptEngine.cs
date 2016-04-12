@@ -4,15 +4,11 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Data.SqlClient;
-using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
-using System.Windows.Input;
-using Microsoft.Practices.EnterpriseLibrary.Data;
 
 namespace xpf.Scripting.SQLServer
 {
@@ -25,16 +21,16 @@ namespace xpf.Scripting.SQLServer
             Restore,
             Delete
         }
-
-        string ConnectionString { get; set; }
-        protected string DatabaseName { get; set; }
         protected int Timeout { get; set; }
 
         SnapshotMode SelectedSnapshotMode;
 
+        private SqlDatabase Database { get; set; }
+
         public SqlScriptEngine(string databaseName)
         {
-            this.DatabaseName = databaseName;
+            this.Database = new SqlDatabase();
+            this.Database.SetConnectionStringFromConfig(databaseName);
             this.ParameterPrefix = "@";
         }
 
@@ -83,13 +79,13 @@ namespace xpf.Scripting.SQLServer
 
         public SqlScriptEngine WithConnectionString(string connectionString)
         {
-            this.ConnectionString = connectionString;
+            this.Database.ConnectionString = connectionString;
             return this;
         }
 
         public SqlScriptEngine WithTimeout(int timeoutInSeconds)
         {
-            this.Timeout = timeoutInSeconds;
+            this.Database.Timeout = timeoutInSeconds;
             return this;
         }
 
@@ -218,7 +214,7 @@ namespace xpf.Scripting.SQLServer
 
 
             // First we need to determine if there are any existing snapshots to restore, attempting to restore without snapshots will result in an exception
-            var scriptCount = new Script().Database().WithConnectionString(this.ConnectionString)
+            var scriptCount = new Script().Database().WithConnectionString(this.Database.ConnectionString)
                 .UsingCommand("SELECT @Count = Count(*) FROM sys.databases sd WHERE sd.source_database_id = db_id()")
                 .WithOut(new { Count = DbType.Int32 })
                 .Execute();
@@ -234,7 +230,7 @@ namespace xpf.Scripting.SQLServer
                 var resultScript = this.Execute(new ScriptDetail { Command = script, OutParameters = new { SqlCmd = DbType.String } });
 
                 // Step 2: Execute against the master database
-                var engine = new Script().Database().WithConnectionString(this.ConnectionString).UsingMaster()
+                var engine = new Script().Database().WithConnectionString(this.Database.ConnectionString).UsingMaster()
                     .UsingCommand(resultScript[0].Value as string)
                     .Execute();
             }
@@ -266,11 +262,8 @@ namespace xpf.Scripting.SQLServer
         {
             try
             {
-                var dataAccess = GetDatabase();
-                var c = this.GetDbCommandForScript(dataAccess, scriptDetail);
-
-                dataAccess.ExecuteNonQuery(c);
-
+                var c = this.GetDbCommandForScript(scriptDetail);
+                this.Database.Execute(c);
                 var values = new FieldList();
                 foreach (DbParameter p in c.Parameters)
                     values.Add(new Field(p.ParameterName.Substring(1), p.Value));
@@ -291,7 +284,7 @@ namespace xpf.Scripting.SQLServer
 
                 // To make diagnosics easier add some important details to the exception
                 throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.ConnectionString, scriptDetail.Command), ex);
+                    this.Database.ConnectionString, scriptDetail.Command), ex);
             }
         }
 
@@ -303,11 +296,9 @@ namespace xpf.Scripting.SQLServer
         {
             try
             {
-                var dataAccess = GetDatabase();
-                var c = this.GetDbCommandForScript(dataAccess, scriptDetail);
+                var c = this.GetDbCommandForScript(scriptDetail);
 
-                await this.ExecuteWithRetry(async () =>
-                            await Task.Factory.FromAsync(dataAccess.BeginExecuteNonQuery, dataAccess.EndExecuteNonQuery, c, null).ConfigureAwait(false)).ConfigureAwait(false);
+                await this.Database.ExecuteAsync(c);
 
                 var values = new FieldList();
                 foreach (DbParameter p in c.Parameters)
@@ -329,7 +320,7 @@ namespace xpf.Scripting.SQLServer
 
                 // To make diagnosics easier add some important details to the exception
                 throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.ConnectionString, scriptDetail.Command), ex);
+                    this.Database.ConnectionString, scriptDetail.Command), ex);
             }
         }
         public ReaderResult ExecuteReader()
@@ -342,12 +333,10 @@ namespace xpf.Scripting.SQLServer
                 if (this.EnableParallelExecutionProperty)
                     throw new ArgumentException("Parallel execution is not supported for ExecuteReader.");
 
-                var dataAccess = GetDatabase();
-
                 scriptDetail = this.scriptsToExecute[0];
-                var c = this.GetDbCommandForScript(dataAccess, scriptDetail);
+                var c = this.GetDbCommandForScript(scriptDetail);
 
-                var dataReader = this.ExecuteWithRetry(() => dataAccess.ExecuteReader(c));
+                var dataReader = this.Database.ExecuteReader(c);
 
                 if (Script.Tracing.IsTracingEnabled)
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null);
@@ -362,7 +351,7 @@ namespace xpf.Scripting.SQLServer
 
                 // To make diagnosics easier add some important details to the exception
                 throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.ConnectionString, scriptDetail.Command), ex);
+                    this.Database.ConnectionString, scriptDetail.Command), ex);
             }
         }
 
@@ -380,19 +369,18 @@ namespace xpf.Scripting.SQLServer
                 if (this.EnableParallelExecutionProperty)
                     throw new ArgumentException("Parallel execution is not supported for ExecuteReader.");
 
-                var dataAccess = GetDatabase();
-
                 scriptDetail = this.scriptsToExecute[0];
-                var c = this.GetDbCommandForScript(dataAccess, scriptDetail);
+                var c = this.GetDbCommandForScript(scriptDetail);
 
-                var dataReader = await this.ExecuteWithRetry(async () =>
-                            await Task<IDataReader>.Factory.FromAsync(dataAccess.BeginExecuteReader, dataAccess.EndExecuteReader, c, null).ConfigureAwait(false)).ConfigureAwait(false);
+                var dataReader = await this.Database.ExecuteReaderAsync(c);
 
                 if (Script.Tracing.IsTracingEnabled)
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null);
 
                 this.ResetState();
                 return new ReaderResult(dataReader);
+
+                return null;
             }
             catch (SqlException ex)
             {
@@ -401,17 +389,16 @@ namespace xpf.Scripting.SQLServer
 
                 // To make diagnosics easier add some important details to the exception
                 throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.ConnectionString, scriptDetail.Command), ex);
+                    this.Database.ConnectionString, scriptDetail.Command), ex);
             }
         }
 
-        DbCommand GetDbCommandForScript(Database dataAccess, ScriptDetail scriptDetail)
+        SqlCommand GetDbCommandForScript(ScriptDetail scriptDetail)
         {
-            DbCommand c = null;
             string executionScript = this.StripComments(scriptDetail.Command);
 
-            c = dataAccess.GetSqlStringCommand(executionScript);
-            if (this.Timeout != 0) c.CommandTimeout = Timeout;
+            var c = new SqlCommand(executionScript);
+
 
             if (scriptDetail.OutParameters != null)
             {
@@ -419,7 +406,8 @@ namespace xpf.Scripting.SQLServer
                 {
                     foreach (var p in (IEnumerable<string>)scriptDetail.OutParameters)
                     {
-                        dataAccess.AddOutParameter(c, "@" + p, DbType.Object, int.MaxValue);
+                        c.AddOutParameter("@" + p, SqlDbType.Variant);
+                        //dataAccess.AddOutParameter(c, "@" + p, DbType.Object, int.MaxValue);
                     }
                 }
 
@@ -428,7 +416,8 @@ namespace xpf.Scripting.SQLServer
                     var properties = scriptDetail.OutParameters.GetType().GetProperties();
                     foreach (var p in properties)
                     {
-                        dataAccess.AddOutParameter(c, "@" + p.Name, (DbType)p.GetValue(scriptDetail.OutParameters, null), int.MaxValue);
+                        c.AddOutParameter("@" + p.Name, ConvertFromDbTypeToSqlType((DbType)p.GetValue(scriptDetail.OutParameters, null)));
+                        //dataAccess.AddOutParameter(c, "@" + p.Name, (DbType)p.GetValue(scriptDetail.OutParameters, null), int.MaxValue);
                     }
                 }
             }
@@ -438,21 +427,22 @@ namespace xpf.Scripting.SQLServer
                 var properties = scriptDetail.InParameters.GetType().GetProperties();
                 foreach (var p in properties)
                 {
-                    dataAccess.AddInParameter(c, "@" + p.Name, ConvertToSqlType(p.PropertyType), p.GetValue(scriptDetail.InParameters, null));
+                    var dbType = ConvertToSqlType(p.PropertyType);
+                    c.AddInParameter("@" + p.Name, dbType, p.GetValue(scriptDetail.InParameters, null));
+                    //dataAccess.AddInParameter(c, "@" + p.Name, , p.GetValue(scriptDetail.InParameters, null));
                 }
             }
 
             return c;
         }
 
+
         public SqlScriptEngine UseCataglog(string catalongName)
         {
             // Get the existing connection string and modify the inital catalog
-            var db = this.GetDatabase();
-
-            var cs = new SqlConnectionStringBuilder(db.ConnectionString);
+            var cs = new SqlConnectionStringBuilder(this.Database.ConnectionString);
             cs.InitialCatalog = catalongName;
-            this.ConnectionString = cs.ConnectionString;
+            this.Database.ConnectionString = cs.ConnectionString;
             return this;
         }
 
@@ -461,39 +451,70 @@ namespace xpf.Scripting.SQLServer
             return this.UseCataglog("master");
         }
 
-        static DbType ConvertToSqlType(Type datatype)
+        //static DbType ConvertToSqlType(Type datatype)
+        //{
+        //    switch (datatype.Name)
+        //    {
+        //        case "Int32":
+        //        case "Int16":
+        //            return DbType.Int32;
+        //        case "Int64":
+        //            return DbType.Int64;
+        //        case "DateTime":
+        //            return DbType.DateTime;
+        //        case "Guid":
+        //            return DbType.Guid;
+        //        case "Byte[]":
+        //            return DbType.Binary;
+        //        case "Class":
+        //            return SqlDbType.Structured
+        //        default:
+        //            return DbType.String;
+        //    }
+
+        static SqlDbType ConvertFromDbTypeToSqlType(DbType datatype)
+        {
+            switch (datatype)
+            {
+                case DbType.String:
+                    return SqlDbType.NVarChar;
+                case DbType.Int32:
+                    return SqlDbType.Int;
+                case DbType.Int64:
+                    return SqlDbType.BigInt;
+                case DbType.DateTime:
+                    return SqlDbType.DateTime2;
+                case DbType.Guid:
+                    return SqlDbType.UniqueIdentifier;
+                case DbType.Binary:
+                    return SqlDbType.Binary;
+                default:
+                    return SqlDbType.Variant;
+            }
+        }
+
+        static SqlDbType ConvertToSqlType(Type datatype)
         {
             switch (datatype.Name)
             {
                 case "Int32":
                 case "Int16":
-                    return DbType.Int32;
+                    return SqlDbType.Int;
                 case "Int64":
-                    return DbType.Int64;
+                    return SqlDbType.BigInt;
                 case "DateTime":
-                    return DbType.DateTime;
+                    return SqlDbType.DateTime2;
                 case "Guid":
-                    return DbType.Guid;
+                    return SqlDbType.UniqueIdentifier;
                 case "Byte[]":
-                    return DbType.Binary;
+                    return SqlDbType.Binary;
+                case "String":
+                    return SqlDbType.NVarChar;
+                case "Class":
+                    return SqlDbType.Structured;
                 default:
-                    return DbType.String;
+                    return SqlDbType.Variant;
             }
-        }
-
-        Database GetDatabase()
-        {
-            var factory = new DatabaseProviderFactory();
-            Database dataAccess;
-
-            if (this.ConnectionString != null)
-                dataAccess = new Microsoft.Practices.EnterpriseLibrary.Data.Sql.SqlDatabase(this.ConnectionString);
-            else if (this.DatabaseName == null)
-                dataAccess = factory.CreateDefault();
-            else
-                dataAccess = factory.Create(this.DatabaseName);
-
-            return dataAccess;
         }
 
         string StripComments(string s)
