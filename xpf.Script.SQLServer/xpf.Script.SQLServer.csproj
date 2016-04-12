@@ -39,9 +39,9 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="xpf.Script, Version=0.1.3.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\xpf.Script.0.1.3.0\lib\portable-net45+win+wpa81\xpf.Script.dll</HintPath>
+    <Reference Include="xpf.Script, Version=0.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\xpf.Script.0.2.0.0\lib\portable-net45+win+wpa81+Xamarin.iOS10+MonoAndroid10+MonoTouch10\xpf.Script.dll</HintPath>
+      <Private>True</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -58,9 +58,7 @@
     <Compile Include="SqlServerExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config">
-      <SubType>Designer</SubType>
-    </None>
+    <None Include="packages.config" />
     <None Include="xpf.Script.SQLServer.nuspec" />
   </ItemGroup>
   <ItemGroup>
