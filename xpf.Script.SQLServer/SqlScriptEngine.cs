@@ -428,11 +428,23 @@ namespace xpf.Scripting.SQLServer
                     var value = p.GetValue(scriptDetail.InParameters, null);
                     if (dbType == SqlDbType.Structured)
                     {
-                        
-                        c.AddStructuredInParameter("@" + p.Name, dbType, value, $"{p.PropertyType.GenericTypeArguments[0].Name}Type");
+                        var typeName = "";
+                        if (p.PropertyType.GenericTypeArguments.Length != 0)
+                            typeName = $"{p.PropertyType.GenericTypeArguments[0].Name}Type";
+                        else if (p.PropertyType.IsArray)
+                            typeName = $"{p.PropertyType.GetElementType().Name}Type";
+                        else
+                            throw new ArgumentException("Collections must implement IEnumerable.");
+
+                        c.AddStructuredInParameter("@" + p.Name, dbType, value as IList, typeName);
                     }
                     else
+                    {
+                        if (value == null)
+                            dbType = SqlDbType.Variant;
+
                         c.AddInParameter("@" + p.Name, dbType, value);
+                    }
 
                 }
             }
@@ -454,27 +466,6 @@ namespace xpf.Scripting.SQLServer
         {
             return this.UseCataglog("master");
         }
-
-        //static DbType ConvertToSqlType(Type datatype)
-        //{
-        //    switch (datatype.Name)
-        //    {
-        //        case "Int32":
-        //        case "Int16":
-        //            return DbType.Int32;
-        //        case "Int64":
-        //            return DbType.Int64;
-        //        case "DateTime":
-        //            return DbType.DateTime;
-        //        case "Guid":
-        //            return DbType.Guid;
-        //        case "Byte[]":
-        //            return DbType.Binary;
-        //        case "Class":
-        //            return SqlDbType.Structured
-        //        default:
-        //            return DbType.String;
-        //    }
 
         static SqlDbType ConvertFromDbTypeToSqlType(DbType datatype)
         {
@@ -499,7 +490,15 @@ namespace xpf.Scripting.SQLServer
 
         internal static SqlDbType ConvertToSqlType(Type datatype)
         {
-            switch (datatype.Name)
+            // Validate collections first
+            if(!typeof(string).IsAssignableFrom(datatype) && typeof(IEnumerable).IsAssignableFrom(datatype))
+                return SqlDbType.Structured;
+
+            var datatypeName = datatype.Name;
+            if (datatype.IsGenericType)
+                datatypeName = datatype.GetGenericArguments()[0].Name;
+
+            switch (datatypeName)
             {
                 case "Int32":
                 case "Int16":
@@ -514,8 +513,6 @@ namespace xpf.Scripting.SQLServer
                     return SqlDbType.Binary;
                 case "String":
                     return SqlDbType.Text;
-                case "List`1": // Need to add other IEnumerable types here
-                    return SqlDbType.Structured;
                 default:
                     return SqlDbType.Variant;
             }

@@ -76,9 +76,80 @@ namespace xpf.IO.Test
         }
 
         [TestMethod]
+        public void Execute_SupportInParameterWithEmptyCollections()
+        {
+            string embeddedScriptName =
+                "DELETE FROM TestTable WHERE ID > 10" +
+                "INSERT INTO TestTable(Id, Field1, Field2, Field3) SELECT A.Id, A.Field1, A.Field2, A.Field3 FROM @TestTableValues AS A\r\n" +
+                "SELECT @Records = COUNT(1) FROM TestTable";
+
+            var rows = new List<TestTable>();
+
+            var result = new Script()
+                .Database()
+                .UsingCommand(embeddedScriptName)
+                .WithIn(new { TestTableValues = rows })
+                .WithOut(new { Records = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(3, result.Property.Records);
+        }
+
+        [TestMethod]
+        public void Execute_SupportInParameterWithEmptyArray()
+        {
+            string embeddedScriptName =
+                "DELETE FROM TestTable WHERE ID > 10" +
+                "INSERT INTO TestTable(Id, Field1, Field2, Field3) SELECT A.Id, A.Field1, A.Field2, A.Field3 FROM @TestTableValues AS A\r\n" +
+                "SELECT @Records = COUNT(1) FROM TestTable";
+
+            var rows = new TestTable[0];
+
+            var result = new Script()
+                .Database()
+                .UsingCommand(embeddedScriptName)
+                .WithIn(new { TestTableValues = rows })
+                .WithOut(new { Records = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(3, result.Property.Records);
+        }
+
+
+        [TestMethod]
         public void Execute_SupportInParamsWithNullValues()
         {
             string nullValue = null;
+            var result = new Script()
+                .Database()
+                .UsingCommand("Select @OutParam1 = Id from TestTable where Id = 1 OR Id = @MyParam1")
+                .WithIn(new { MyParam1 = nullValue })
+                .WithOut(new { OutParam1 = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(1, result.Property.OutParam1);
+        }
+
+        // Feature#12
+        [TestMethod]
+        public void Execute_SupportInParamsWithNullableNullValue()
+        {
+            int? nullValue = null;
+            var result = new Script()
+                .Database()
+                .UsingCommand("Select @OutParam1 = Id from TestTable where Id = 1 OR Id = @MyParam1")
+                .WithIn(new { MyParam1 = nullValue })
+                .WithOut(new { OutParam1 = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(1, result.Property.OutParam1);
+        }
+
+        // Feature#12
+        [TestMethod]
+        public void Execute_SupportInParamsWithNullableNonNullValue()
+        {
+            int? nullValue = 1;
             var result = new Script()
                 .Database()
                 .UsingCommand("Select @OutParam1 = Id from TestTable where Id = 1 OR Id = @MyParam1")

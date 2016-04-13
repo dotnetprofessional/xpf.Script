@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
+using System.Linq;
 
 namespace xpf.Scripting.SQLServer
 {
@@ -20,12 +21,14 @@ namespace xpf.Scripting.SQLServer
             parameter.SqlDbType = type;
         }
 
-        public static void AddStructuredInParameter(this SqlCommand command, string name, SqlDbType type, object value, string tableType)
+        public static void AddStructuredInParameter(this SqlCommand command, string name, SqlDbType type, IEnumerable value, string tableType)
         {
-            if (value == null)
-                value = DBNull.Value;
+            object tvp = null;
+            var hasRecords = value?.GetEnumerator()?.MoveNext();
+            if (value != null && hasRecords.GetValueOrDefault())
+                tvp = new TableValueCollection(value as IEnumerable<object>);
 
-            var parameter = command.Parameters.AddWithValue(name, new TableValueCollection(value as IEnumerable<object>));
+            var parameter = command.Parameters.AddWithValue(name, tvp);
             parameter.SqlDbType = type;
             parameter.TypeName = tableType;
         }

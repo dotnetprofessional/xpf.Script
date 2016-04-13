@@ -15,6 +15,7 @@ namespace xpf.Scripting.SQLServer
             // Craete the meta-data for the object type
             if (this.Count > 0)
             {
+
                 var columns = new List<SqlMetaData>();
                 var properties = this[0].GetType().GetProperties();
                 foreach (var p in properties)
