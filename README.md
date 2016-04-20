@@ -40,3 +40,7 @@ __Execute scripts__
 ``` 
 
 See the [WIKI](https://github.com/dotnetprofessional/xpf.Script/wiki) pages for more documentation on how to use the library.
+
+[xpf.Script Change List](https://github.com/dotnetprofessional/xpf.Script/blob/master/xpf.Script/ChangeLog.txt)
+
+[xpf.Script.SQLServer Change List](https://github.com/dotnetprofessional/xpf.Script/blob/master/xpf.Script.SQLServer/ChangeLog.txt)
