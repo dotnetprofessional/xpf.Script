@@ -13,3 +13,11 @@ Version			Change
 				Minor changes to support .AppendCommand introduced to xpf.Script library 
 0.1.1.0			?
 0.1.1.1			Added support for transient exceptions. Will now retry 3 times for a set of SQL exceptions known to be transient in nature.
+0.1.1.2			Changed the SqlScriptException to have first class properties to make it easier to understand the values. 
+	 .3*		Added additional transient error number 19 to support bad connection pool connections (unusable connections)
+				Increased time between retries to 1 second
+				Bug#16: Exposing passwords in connection strings when excpetions thrown
+
+
+
+* Denotes a file version number change only. These are typically done during a development cycle and is used to keep track of minor bug fix changes.

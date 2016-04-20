@@ -282,8 +282,7 @@ namespace xpf.Scripting.SQLServer
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
 
                 // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.ConnectionString, c.CommandText), ex);
+                throw new SqlScriptException(ex.Message, this.ConnectionString, c.CommandText, ex);
             }
         }
 
@@ -302,7 +301,7 @@ namespace xpf.Scripting.SQLServer
 
                 scriptDetail = this.scriptsToExecute[0];
                 string executionScript = scriptDetail.Command;
-
+                
                 c = dataAccess.GetSqlStringCommand(this.StripComments(executionScript));
                 if (this.Timeout != 0) c.CommandTimeout = Timeout;
 
@@ -330,8 +329,7 @@ namespace xpf.Scripting.SQLServer
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
 
                 // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.ConnectionString, c.CommandText), ex);
+                throw new SqlScriptException(ex.Message, this.ConnectionString, c.CommandText, ex);
             }
         }
 
@@ -491,6 +489,7 @@ namespace xpf.Scripting.SQLServer
                     switch (ex.Number)
                     {
                         case 1205: // Dead-lock
+                        case 19: // Unusable connection
                         case -2: // Timeout Expired
                         case 64: // An error occurred during login
                         case 233: //Connection initialization error. 
@@ -510,7 +509,7 @@ namespace xpf.Scripting.SQLServer
 
                             // Put a small delay before attempting again
                             if(shouldRetry)
-                                Thread.Sleep(500);
+                                Thread.Sleep(1000);
                             break;
                         default:
                             throw;
