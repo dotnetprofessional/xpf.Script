@@ -211,7 +211,19 @@ namespace xpf.Scripting.SqlServer.Test
                 .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
                 .Execute();
 
-            action.ShouldThrow<SqlScriptException>().Which.Message.Should().Contain("Data Source=.").And.Contain("SELECT * FROM TABLE");
+            action.ShouldThrow<SqlScriptException>().Which.Command.Should().Contain("SELECT * FROM TABLE");
+        }
+
+        [TestMethod]
+        public void When_calling_Execute_that_fails_a_SqlScriptException_is_thrown_without_the_password_being_exposed()
+        {
+            Action action = () => new Script()
+                .Database().WithConnectionString("Data Source=.;Initial Catalog=xpfScript1;User Id=xpfScriptTester;password=mypassword")
+                .WithTimeout(1)
+                .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
+                .Execute();
+
+            action.ShouldThrow<SqlScriptException>().Which.ConnectionString.Should().NotContain("mypassword");
         }
     }
 }

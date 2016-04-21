@@ -15,7 +15,11 @@ namespace xpf.Scripting.SQLServer
             this.Catalog = connBuilder.InitialCatalog;
             this.UserName = connBuilder.UserID;
 
-            safeConnectionString = connectionString.Replace(connBuilder.Password, "****");
+            if (connBuilder.Password.Length > 0)
+                safeConnectionString = connectionString.Replace(connBuilder.Password, "****");
+            else
+                safeConnectionString = connectionString;
+
             this.Command = command;
             this.ConnectionString = safeConnectionString;
         }
