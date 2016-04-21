@@ -229,6 +229,7 @@ namespace xpf.Scripting
             }
         }
 
+        // TODO: This really should be in the SQLServer provider
         static string SanitizeValue(string stringValue)
         {
             if (null == stringValue)
