@@ -259,9 +259,10 @@ namespace xpf.Scripting.SQLServer
 
         FieldList Execute(ScriptDetail scriptDetail)
         {
+            SqlCommand c = null;
             try
             {
-                var c = this.GetDbCommandForScript(scriptDetail);
+                c = this.GetDbCommandForScript(scriptDetail);
                 this.Database.Execute(c);
                 var values = new FieldList();
                 foreach (DbParameter p in c.Parameters)
@@ -282,8 +283,7 @@ namespace xpf.Scripting.SQLServer
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
 
                 // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.Database.ConnectionString, scriptDetail.Command), ex);
+                throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex);
             }
         }
 
@@ -293,9 +293,10 @@ namespace xpf.Scripting.SQLServer
         /// </remarks>
         async Task<FieldList> ExecuteAsync(ScriptDetail scriptDetail)
         {
+            SqlCommand c = null;
             try
             {
-                var c = this.GetDbCommandForScript(scriptDetail);
+                c = this.GetDbCommandForScript(scriptDetail);
 
                 await this.Database.ExecuteAsync(c);
 
@@ -318,13 +319,13 @@ namespace xpf.Scripting.SQLServer
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
 
                 // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.Database.ConnectionString, scriptDetail.Command), ex);
+                throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex);
             }
         }
         public ReaderResult ExecuteReader()
         {
             ScriptDetail scriptDetail = null;
+            SqlCommand c = null;
             try
             {
                 base.Execute();
@@ -333,7 +334,7 @@ namespace xpf.Scripting.SQLServer
                     throw new ArgumentException("Parallel execution is not supported for ExecuteReader.");
 
                 scriptDetail = this.scriptsToExecute[0];
-                var c = this.GetDbCommandForScript(scriptDetail);
+                c = this.GetDbCommandForScript(scriptDetail);
 
                 var dataReader = this.Database.ExecuteReader(c);
 
@@ -349,8 +350,7 @@ namespace xpf.Scripting.SQLServer
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
 
                 // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.Database.ConnectionString, scriptDetail.Command), ex);
+                throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex);
             }
         }
 
@@ -361,6 +361,8 @@ namespace xpf.Scripting.SQLServer
         public async Task<ReaderResult> ExecuteReaderAsync()
         {
             ScriptDetail scriptDetail = null;
+            SqlCommand c = null;
+
             try
             {
                 base.Execute();
@@ -369,7 +371,7 @@ namespace xpf.Scripting.SQLServer
                     throw new ArgumentException("Parallel execution is not supported for ExecuteReader.");
 
                 scriptDetail = this.scriptsToExecute[0];
-                var c = this.GetDbCommandForScript(scriptDetail);
+                c = this.GetDbCommandForScript(scriptDetail);
 
                 var dataReader = await this.Database.ExecuteReaderAsync(c);
 
@@ -378,8 +380,6 @@ namespace xpf.Scripting.SQLServer
 
                 this.ResetState();
                 return new ReaderResult(dataReader);
-
-                return null;
             }
             catch (SqlException ex)
             {
@@ -387,8 +387,7 @@ namespace xpf.Scripting.SQLServer
                     Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
 
                 // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(string.Format("Connection string: {1}{0}Command: {2}", Environment.NewLine,
-                    this.Database.ConnectionString, scriptDetail.Command), ex);
+                throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex);
             }
         }
 
@@ -491,7 +490,7 @@ namespace xpf.Scripting.SQLServer
         internal static SqlDbType ConvertToSqlType(Type datatype)
         {
             // Validate collections first
-            if(!typeof(string).IsAssignableFrom(datatype) && typeof(IEnumerable).IsAssignableFrom(datatype))
+            if (!typeof(string).IsAssignableFrom(datatype) && typeof(IEnumerable).IsAssignableFrom(datatype))
                 return SqlDbType.Structured;
 
             var datatypeName = datatype.Name;
@@ -624,6 +623,7 @@ namespace xpf.Scripting.SQLServer
                     switch (ex.Number)
                     {
                         case 1205: // Dead-lock
+                        case 19: // Unusable connection
                         case -2: // Timeout Expired
                         case 64: // An error occurred during login
                         case 233: //Connection initialization error. 
@@ -643,7 +643,7 @@ namespace xpf.Scripting.SQLServer
 
                             // Put a small delay before attempting again
                             if (shouldRetry)
-                                Thread.Sleep(500);
+                                Thread.Sleep(1000);
                             break;
                         default:
                             throw;
