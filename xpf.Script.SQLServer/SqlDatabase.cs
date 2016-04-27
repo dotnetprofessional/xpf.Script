@@ -37,8 +37,12 @@ namespace xpf.Scripting.SQLServer
                 command.Connection = connection;
                 command.CommandTimeout = this.Timeout;
 
-                connection.Open();
-                this.ExecuteWithRetry(command.ExecuteNonQuery);
+                this.ExecuteWithRetry(() =>
+                {
+                    connection.Close(); // This should remove broken connections from the pool
+                    connection.Open();
+                    return command.ExecuteNonQuery();
+                });
             }
         }
 
@@ -47,8 +51,12 @@ namespace xpf.Scripting.SQLServer
             var connection = new SqlConnection(this.ConnectionString);
             command.Connection = connection;
             command.CommandTimeout = this.Timeout;
-            connection.Open();
-            return this.ExecuteWithRetry(command.ExecuteReader);
+            return this.ExecuteWithRetry(() =>
+            {
+                connection.Close(); // This should remove broken connections from the pool
+                connection.Open();
+                return command.ExecuteReader();
+            });
         }
 
         public async Task<IDataReader> ExecuteReaderAsync(SqlCommand command)
@@ -56,19 +64,29 @@ namespace xpf.Scripting.SQLServer
             var connection = new SqlConnection(this.ConnectionString);
             command.Connection = connection;
             command.CommandTimeout = this.Timeout;
-            connection.Open();
-            return await this.ExecuteWithRetry(async () => await command.ExecuteReaderAsync().ConfigureAwait(false)).ConfigureAwait(false);
+            return await this.ExecuteWithRetry(async () =>
+            {
+                connection.Close(); // This should remove broken connections from the pool
+                connection.Open();
+
+                return await command.ExecuteReaderAsync().ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
 
         public async Task ExecuteAsync(SqlCommand command)
         {
             var connection = new SqlConnection(this.ConnectionString);
+            command.Connection = connection;
+            command.CommandTimeout = this.Timeout;
             using (connection)
             {
-                command.Connection = connection;
-                command.CommandTimeout = this.Timeout;
-                connection.Open();
-                await this.ExecuteWithRetry(async () => await command.ExecuteNonQueryAsync().ConfigureAwait(false)).ConfigureAwait(false);
+                await this.ExecuteWithRetry(async () =>
+                {
+                    connection.Close(); // This should remove broken connections from the pool
+                    connection.Open();
+
+                    return await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                }).ConfigureAwait(false);
             }
         }
 
@@ -88,18 +106,25 @@ namespace xpf.Scripting.SQLServer
                 {
                     switch (ex.Number)
                     {
-                        case 1205: // Dead-lock
-                        case -2: // Timeout Expired
-                        case 64: // An error occurred during login
-                        case 233: //Connection initialization error. 
-                        case 10053: //A transport-level error occurred when receiving results from the server.
-                        case 10054: //A transport-level error occurred when receiving results from the server.
+                        case 0:     // ???
+                        case 1205:  // Dead-lock
+                        case -2:    // Timeout Expired
+                        case 19:    // Physical connection is not usable
+                        case 20:    // ??? 
+                        case 64:    // An error occurred during login
+                        case 233:   // Connection initialization error. 
+                        case 10053: // A transport-level error occurred when receiving results from the server.
+                        case 10054: // A transport-level error occurred when receiving results from the server.
                         case 10060: // Network or instance-specific error.  
-                        case 40143: //Connection could not be initialized.  
+                        case 40143: // Connection could not be initialized.  
                         case 40197: // The service encountered an error processing your request
                         case 40501: // The server is busy.  
                         case 40613: // The database is currently unavailable. 
-                        case 4060: // Cannot open database "%.*ls" requested by the login. The login failed. 
+                        case 41325: // The current transaction failed to commit due to a serializable validation failure.
+                        case 41305: // The current transaction failed to commit due to a repeatable read validation failure.
+                        case 41302: // The current transaction attempted to update a record that has been updated since the transaction started.
+                        case 41301: // A previous transaction that the current transaction took a dependency on has aborted, and the current transaction can no longer commit
+                        case 4060:  // Cannot open database "%.*ls" requested by the login. The login failed. 
                         case 10928: // The %s limit for the database is %d and has been reached
                         case 10929: // The %s limit for the database is %d and has been reached
                             // Validate if a retry should be performed
@@ -108,7 +133,7 @@ namespace xpf.Scripting.SQLServer
 
                             // Put a small delay before attempting again
                             if (shouldRetry)
-                                Thread.Sleep(500);
+                                Thread.Sleep(1000);
                             break;
                         default:
                             throw;
