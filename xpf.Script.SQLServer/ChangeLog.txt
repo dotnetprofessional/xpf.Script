@@ -21,6 +21,8 @@ Version			Change
 				Feature#15: Add Async support
 				Feature#12: Support Nullable Types for .WithIn method
 				Removed dependency on the Enterprise Library Data Access Block.
+0.2.0.1			Bug#16: Exposing password in SqlExceptions - Fixed
+0.2.0.2			Bug#17: Transient exceptions that result in bad connections, will always fail. Now will close and reopen connections before retry.
 
 * Denotes a file version number change only. These are typically done during a development cycle and is used to keep track of minor bug fix changes.
 				
