@@ -6,7 +6,7 @@
 
 CREATE DATABASE xpfScript
 Go
-USE xpfIOScript
+USE xpfScript
 GO
 /****** Object:  Table [dbo].[TestTable]    Script Date: 06/18/2009 14:18:42 ******/
 SET ANSI_NULLS ON
@@ -79,3 +79,9 @@ INSERT INTO DataTypeCheckTable
 		(NonNullString, NullableString, NonNullNumeric, NullableNumeric, NonNullDateTime, NullableDateTime)
 	VALUES
 		('Some Text 2', null, 200, null, '2011-01-02', null)
+
+CREATE TYPE dbo.TestTableType AS TABLE
+    ( [Id] [int] NOT NULL,
+	[Field1] [varchar](50) NOT NULL,
+	[Field2] [datetime] NOT NULL,
+	[Field3] [uniqueidentifier] NOT NULL)

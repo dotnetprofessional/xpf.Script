@@ -7,4 +7,5 @@ Version			Change
 0.1.1			Exposed access to load script so that inherited classes can store thier own resources
 0.1.2			Added tracing support. This is very useful in debugging/testing scenarios to track what script is executed an in what order.
 0.1.3			Add support for appending command text to Scripts or Commands. This introduced the new keywords
-				.AppendCommand("...") 
+				.AppendCommand("...")
+0.2.0			Adding support for arbitary value passing via the Bind method. See feature #13

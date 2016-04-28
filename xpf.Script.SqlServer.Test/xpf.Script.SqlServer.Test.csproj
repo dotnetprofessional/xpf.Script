@@ -121,6 +121,7 @@
     <EmbeddedResource Include="DatabaseScripts\Execute_InsertRecord.sql" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="DatabaseScripts\ExecuteReader_SupportOutParams.sql" />
     <Content Include="DatabaseSetup.sql" />
   </ItemGroup>
   <ItemGroup>

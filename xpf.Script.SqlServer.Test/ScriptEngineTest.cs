@@ -18,8 +18,8 @@ namespace xpf.Scripting.SqlServer.Test
                 new Script()
                     .Database()
                     .UsingCommand("SELECT * FROM TABLE")
-                    .WithIn(new {Property1 = "Hello"})
-                    .WithIn(new {Property2 = "Goodbye"});
+                    .WithIn(new { Property1 = "Hello" })
+                    .WithIn(new { Property2 = "Goodbye" });
 
                 Assert.Fail("Argument Exception expected");
             }
@@ -36,8 +36,8 @@ namespace xpf.Scripting.SqlServer.Test
             Action action = () => new Script()
                 .Database()
                 .UsingCommand("SELECT * FROM TABLE")
-                .WithOut(new {Property1 = "Hello"})
-                .WithOut(new {Property2 = "Goodbye"});
+                .WithOut(new { Property1 = "Hello" })
+                .WithOut(new { Property2 = "Goodbye" });
 
             action.ShouldThrow<ArgumentException>();
         }
@@ -49,7 +49,7 @@ namespace xpf.Scripting.SqlServer.Test
                 .Database()
                 .EnableValidations()
                 .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
-                .WithIn(new {Property1 = "Hello", Property2 = "Goodbye"})
+                .WithIn(new { Property1 = "Hello", Property2 = "Goodbye" })
                 .Execute();
 
             action.ShouldThrow<KeyNotFoundException>().WithMessage("*Property1*").Which.Message.Should().NotContain("Property2");
@@ -62,7 +62,7 @@ namespace xpf.Scripting.SqlServer.Test
                 .Database()
                 .EnableValidations()
                 .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
-                .WithOut(new {Property1 = "Hello", Property2 = "Goodbye"})
+                .WithOut(new { Property1 = "Hello", Property2 = "Goodbye" })
                 .Execute();
 
             action.ShouldThrow<KeyNotFoundException>().WithMessage("*Property1*").Which.Message.Should().NotContain("Property2");
@@ -79,7 +79,7 @@ namespace xpf.Scripting.SqlServer.Test
             // Assert
             var actual = new Script().Database()
                 .UsingCommand("SELECT @Count = Count(*) FROM sys.databases sd WHERE sd.source_database_id = db_id()")
-                .WithOut(new {Count =DbType.Int32})
+                .WithOut(new { Count = DbType.Int32 })
                 .Execute();
 
             Assert.AreEqual(1, actual.Property.Count);
@@ -119,7 +119,7 @@ namespace xpf.Scripting.SqlServer.Test
             var result = new Script()
                 .Database()
                 .UsingCommand("SELECT @Id = Id FROM TestTable WHERE Id = 1000")
-                .WithOut(new {Id = DbType.Int32})
+                .WithOut(new { Id = DbType.Int32 })
                 .Execute();
 
             Assert.AreEqual(1000, result.Property.Id);
@@ -133,7 +133,7 @@ namespace xpf.Scripting.SqlServer.Test
             result = new Script()
                 .Database()
                 .UsingCommand("SELECT @Id = Id FROM TestTable WHERE Id = 1000")
-                .WithOut(new {Id = DbType.Int32})
+                .WithOut(new { Id = DbType.Int32 })
                 .Execute();
 
             Assert.AreEqual(DBNull.Value, result.Property.Id);
@@ -211,7 +211,19 @@ namespace xpf.Scripting.SqlServer.Test
                 .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
                 .Execute();
 
-            action.ShouldThrow<SqlScriptException>().Which.Message.Should().Contain("Data Source=.").And.Contain("SELECT * FROM TABLE");
+            action.ShouldThrow<SqlScriptException>().Which.Command.Should().Contain("SELECT * FROM TABLE");
+        }
+
+        [TestMethod]
+        public void When_calling_Execute_that_fails_a_SqlScriptException_is_thrown_without_the_password_being_exposed()
+        {
+            Action action = () => new Script()
+                .Database().WithConnectionString("Data Source=.;Initial Catalog=xpfScript1;User Id=xpfScriptTester;password=mypassword")
+                .WithTimeout(1)
+                .UsingCommand("SELECT * FROM TABLE WHERE Field=@Property2")
+                .Execute();
+
+            action.ShouldThrow<SqlScriptException>().Which.ConnectionString.Should().NotContain("mypassword");
         }
     }
 }
