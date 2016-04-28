@@ -45,12 +45,76 @@ namespace xpf.IO.Test
             var result = new Script()
                 .Database()
                 .UsingScript(embeddedScriptName)
-                .WithIn(new {MyParam1 = 2})
+                .WithIn(new { MyParam1 = 2 })
                 .WithOut(new { outParam1 = DbType.Int32 })
                 .Execute();
 
             Assert.AreEqual(2, result.Property.OutParam1);
         }
+
+        [TestMethod]
+        public void Execute_SupportInParameterCollections()
+        {
+            string embeddedScriptName =
+                "DELETE FROM TestTable WHERE ID > 10" +
+                "INSERT INTO TestTable(Id, Field1, Field2, Field3) SELECT A.Id, A.Field1, A.Field2, A.Field3 FROM @TestTableValues AS A\r\n" +
+                "SELECT @Records = COUNT(1) FROM TestTable";
+
+            var rows = new List<TestTable>();
+            rows.Add(new TestTable { Id = 100, Field1 = "100", Field2 = DateTime.Now, Field3 = Guid.NewGuid() });
+            rows.Add(new TestTable { Id = 101, Field1 = "101", Field2 = DateTime.Now, Field3 = Guid.NewGuid() });
+            rows.Add(new TestTable { Id = 102, Field1 = "102", Field2 = DateTime.Now, Field3 = Guid.NewGuid() });
+
+            var result = new Script()
+                .Database()
+                .UsingCommand(embeddedScriptName)
+                .WithIn(new { TestTableValues = rows })
+                .WithOut(new {Records = DbType.Int32})
+                .Execute();
+
+            Assert.AreEqual(6, result.Property.Records);
+        }
+
+        [TestMethod]
+        public void Execute_SupportInParameterWithEmptyCollections()
+        {
+            string embeddedScriptName =
+                "DELETE FROM TestTable WHERE ID > 10" +
+                "INSERT INTO TestTable(Id, Field1, Field2, Field3) SELECT A.Id, A.Field1, A.Field2, A.Field3 FROM @TestTableValues AS A\r\n" +
+                "SELECT @Records = COUNT(1) FROM TestTable";
+
+            var rows = new List<TestTable>();
+
+            var result = new Script()
+                .Database()
+                .UsingCommand(embeddedScriptName)
+                .WithIn(new { TestTableValues = rows })
+                .WithOut(new { Records = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(3, result.Property.Records);
+        }
+
+        [TestMethod]
+        public void Execute_SupportInParameterWithEmptyArray()
+        {
+            string embeddedScriptName =
+                "DELETE FROM TestTable WHERE ID > 10" +
+                "INSERT INTO TestTable(Id, Field1, Field2, Field3) SELECT A.Id, A.Field1, A.Field2, A.Field3 FROM @TestTableValues AS A\r\n" +
+                "SELECT @Records = COUNT(1) FROM TestTable";
+
+            var rows = new TestTable[0];
+
+            var result = new Script()
+                .Database()
+                .UsingCommand(embeddedScriptName)
+                .WithIn(new { TestTableValues = rows })
+                .WithOut(new { Records = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(3, result.Property.Records);
+        }
+
 
         [TestMethod]
         public void Execute_SupportInParamsWithNullValues()
@@ -60,7 +124,37 @@ namespace xpf.IO.Test
                 .Database()
                 .UsingCommand("Select @OutParam1 = Id from TestTable where Id = 1 OR Id = @MyParam1")
                 .WithIn(new { MyParam1 = nullValue })
-                .WithOut(new { OutParam1 = DbType.Int32})
+                .WithOut(new { OutParam1 = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(1, result.Property.OutParam1);
+        }
+
+        // Feature#12
+        [TestMethod]
+        public void Execute_SupportInParamsWithNullableNullValue()
+        {
+            int? nullValue = null;
+            var result = new Script()
+                .Database()
+                .UsingCommand("Select @OutParam1 = Id from TestTable where Id = 1 OR Id = @MyParam1")
+                .WithIn(new { MyParam1 = nullValue })
+                .WithOut(new { OutParam1 = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(1, result.Property.OutParam1);
+        }
+
+        // Feature#12
+        [TestMethod]
+        public void Execute_SupportInParamsWithNullableNonNullValue()
+        {
+            int? nullValue = 1;
+            var result = new Script()
+                .Database()
+                .UsingCommand("Select @OutParam1 = Id from TestTable where Id = 1 OR Id = @MyParam1")
+                .WithIn(new { MyParam1 = nullValue })
+                .WithOut(new { OutParam1 = DbType.Int32 })
                 .Execute();
 
             Assert.AreEqual(1, result.Property.OutParam1);
@@ -73,13 +167,65 @@ namespace xpf.IO.Test
             using (var result = new Script()
                 .Database()
                 .UsingCommand("Select * from TestTable where Id = 1")
-                .WithIn(new {MyParam1 = nullValue})
+                .WithIn(new { MyParam1 = nullValue })
                 .ExecuteReader())
             {
                 result.Should().NotBeNull();
             }
         }
-        
+
+        [TestMethod]
+        public void ExecuteReader_SupportBindValues()
+        {
+            using (var result = new Script()
+                .Database()
+                .UsingCommand("Select * from TestTable where Id IN ({#Id})")
+                .Bind(new { Id = "1,2" })
+                .ExecuteReader())
+            {
+                var count = 0;
+                while (result.NextRecord())
+                    count++;
+
+                count.Should().Be(2);
+            }
+        }
+
+        [TestMethod]
+        public void ExecuteReader_SupportBindWithSanitizationValues()
+        {
+            Action a = () =>
+            {
+                using (var result = new Script()
+                    .Database()
+                    .UsingCommand("Select * from TestTable where Id = {#Id}")
+                    .Bind(new { Id = "1 OR 'x'='x'; ---- A comment" })
+                    .ExecuteReader())
+                {
+
+                }
+            };
+
+            a.ShouldThrow<SqlScriptException>("malicious code was removed making SQL invalid.");
+        }
+
+        [TestMethod]
+        public void ExecuteReader_SupportBindWithoutSanitizationValues()
+        {
+            using (var result = new Script()
+                .Database()
+                .UsingCommand("Select * from TestTable where Id = {!Id}") // Note the ! indicating NO SANITIZATION
+                .Bind(new { Id = "1 OR 'x'='x'; ---- A comment" })
+                .ExecuteReader())
+            {
+                var count = 0;
+                while (result.NextRecord())
+                    count++;
+
+                count.Should().Be(3);
+            }
+        }
+
         [TestMethod]
         public void Execute_ScriptNameOnly()
         {
@@ -96,7 +242,7 @@ namespace xpf.IO.Test
                     .Database()
                     .UsingScript(GetTestTableRecordScript)
                     .WithIn(new { Param1 = 2 })
-                    .WithOut(new { outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString})
+                    .WithOut(new { outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString })
                     .Execute();
 
 
@@ -108,7 +254,7 @@ namespace xpf.IO.Test
         public void ExecuteReader_ScriptNameWithAppendCommand()
         {
             var count = 0;
-                // Execute an update on the table
+            // Execute an update on the table
             using (var script = new Script()
                 .Database()
                 .UsingScript("ExecuteReader_SelectAll.sql").AppendCommand("WHERE Id = 1")
@@ -173,14 +319,28 @@ namespace xpf.IO.Test
             var script = new Script()
                 .Database()
                 .UsingScript(GetTestTableRecordScript).AppendCommand("OR Id = 1")
-                .WithIn(new {Param1 = 200}) // Key doesn't exist
-                .WithOut(new {outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString})
+                .WithIn(new { Param1 = 200 }) // Key doesn't exist
+                .WithOut(new { outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString })
                 .Execute();
 
             // The Where clause added should restrict the result to a single record
             Assert.AreEqual(1, script.Properties["outParam1"].Value);
         }
 
+        [TestMethod]
+        public void ExecuteAsync_ScriptNameWithAppendCommand()
+        {
+            // Execute an update on the table
+            var script = new Script()
+                .Database()
+                .UsingScript(GetTestTableRecordScript).AppendCommand("OR Id = 1")
+                .WithIn(new { Param1 = 200 }) // Key doesn't exist
+                .WithOut(new { outParam1 = DbType.Int32, outParam2 = DbType.AnsiString, outParam3 = DbType.AnsiString })
+                .ExecuteAsync().Result;
+
+            // The Where clause added should restrict the result to a single record
+            Assert.AreEqual(1, script.Properties["outParam1"].Value);
+        }
         [TestMethod]
         public void Execute_ScriptNameWithMultipleAppendCommands()
         {
@@ -215,7 +375,7 @@ namespace xpf.IO.Test
             var script = new Script()
                .Database()
                .UsingCommand("SELECT @Count = COUNT(1) FROM TestTable").AppendCommand(" WHERE Field1='").AppendCommand("Record 1").AppendCommand("'").DisableAppendFormatting
-               .WithOut(new { Count = DbType.Int32})
+               .WithOut(new { Count = DbType.Int32 })
                .Execute();
 
             // The Where clause added should restrict the result to a single record
@@ -274,13 +434,33 @@ namespace xpf.IO.Test
                 var result = new Script()
                     .Database()
                     .UsingCommand("SELECT @RowCount = COUNT(*) FROM TestTable WHERE Id >= 10")
-                    .WithOut(new { RowCount = DbType.Int32})
+                    .WithOut(new { RowCount = DbType.Int32 })
                     .Execute();
 
                 Assert.AreEqual(3, result.Property.RowCount);
             }
         }
+        [TestMethod]
+        public void ExecuteAsync_NestedScriptNameOnlyWithNestedInclude()
+        {
+            using (var x = new TransactionScope())
+            {
+                string embeddedScriptName = "Execute_IncludeScript.sql";
+                new Script()
+                    .Database()
+                    .UsingNestedScript(embeddedScriptName)
+                    .ExecuteAsync().Wait();
 
+                // Now verify that the update was successful
+                var result = new Script()
+                    .Database()
+                    .UsingCommand("SELECT @RowCount = COUNT(*) FROM TestTable WHERE Id >= 10")
+                    .WithOut(new { RowCount = DbType.Int32 })
+                    .ExecuteAsync().Result;
+
+                Assert.AreEqual(3, result.Property.RowCount);
+            }
+        }
         [TestMethod]
         public void Execute_NestedScriptNameOnlyWithNestedColonR()
         {
@@ -339,12 +519,28 @@ namespace xpf.IO.Test
                 .Database()
                 .UsingScript(embeddedScriptName)
                 .WithIn(new { MyParam1 = 2 })
-                .WithOut(new[] { "outParam1"})
+                .WithOut(new[] { "outParam1" })
                 .Execute();
 
             Assert.AreEqual(2, result.Property.OutParam1);
         }
 
+
+        //[TestMethod]
+        //public void ExecuteReader_ScriptNameAndOutParmsAsStringArrayAndInParams()
+        //{
+        //    string embeddedScriptName = "ExecuteReader_SupportOutParams.sql";
+
+        //    // Testing the less recommended way of passing outparams as a simple string array
+        //    var result = new Script()
+        //        .Database()
+        //        .UsingScript(embeddedScriptName)
+        //        .WithIn(new { param1 = 2 })
+        //        .WithOut(new[] { "param2" })
+        //        .ExecuteReader();
+
+        //    Assert.AreEqual(100, result.Property.Param2);
+        //}
 
         [TestMethod]
         public void ExecuteReader_ScriptNameOnly()
@@ -399,7 +595,7 @@ namespace xpf.IO.Test
                 int count = 0;
                 while (result.NextRecord())
                 {
-                    count ++;
+                    count++;
                     Assert.AreEqual(count, result.Fields["Id"].Value);
                     Assert.AreEqual("Record " + count, result.Fields["Field1"].Value);
                 }
@@ -444,6 +640,20 @@ namespace xpf.IO.Test
 
             Assert.AreEqual(27, result.Count);
         }
+        [TestMethod]
+        public void ExecuteReaderAsync_FromXmlToInstance()
+        {
+            string embeddedScriptName = "ExecuteT_ScriptOnly.sql";
+
+            var dataReader = new Script()
+                .Database()
+                .UsingScript(embeddedScriptName)
+                .ExecuteReaderAsync().Result;
+
+            var result = dataReader.FromXmlToInstance<List<TestTable>>();
+
+            Assert.AreEqual(27, result.Count);
+        }
 
         [TestMethod]
         public void ExecuteReader_ToInstance()
@@ -454,6 +664,21 @@ namespace xpf.IO.Test
                 .Database()
                 .UsingScript(embeddedScriptName)
                 .ExecuteReader().ToInstance<TestTable>();
+
+            Assert.AreEqual(3, result.Count);
+        }
+
+        [TestMethod]
+        public void ExecuteReaderAsync_ToInstance()
+        {
+            string embeddedScriptName = "ExecuteReader_SelectAll.sql";
+
+            var dataReader = new Script()
+                .Database()
+                .UsingScript(embeddedScriptName)
+                .ExecuteReaderAsync().Result;
+
+            var result = dataReader.ToInstance<TestTable>();
 
             Assert.AreEqual(3, result.Count);
         }
@@ -488,7 +713,7 @@ namespace xpf.IO.Test
                 var actual = new Script()
                     .Database()
                     .UsingScript("Execute_InsertRecord.sql") // Add one new record
-                    .WithIn(new {Id = 12})
+                    .WithIn(new { Id = 12 })
                     .UsingScript("Execute_InsertRecord.sql") // Add one new record
                     .WithIn(new { Id = 13 })
                     .Execute();
@@ -497,7 +722,7 @@ namespace xpf.IO.Test
                 var result = new Script()
                     .Database()
                     .UsingCommand("SELECT @RowCount = COUNT(*) FROM TestTable WHERE Id >= 10")
-                    .WithOut(new {RowCount = DbType.Int32})
+                    .WithOut(new { RowCount = DbType.Int32 })
                     .Execute();
 
                 // Verify that the results and properties have been applied correctly
@@ -518,33 +743,33 @@ namespace xpf.IO.Test
             {
 
 
-            // Execute the two different scripts
-            var actual = new Script()
-                .Database()
-                .EnableParallelExecution()
-                .UsingScript("Execute_InsertRecord.sql") // Add one new record
-                .WithIn(new {Id = 12})
-                .UsingScript("Execute_InsertRecord.sql") // Add one new record
-                .WithIn(new {Id = 13})
-                .Execute();
+                // Execute the two different scripts
+                var actual = new Script()
+                    .Database()
+                    .EnableParallelExecution()
+                    .UsingScript("Execute_InsertRecord.sql") // Add one new record
+                    .WithIn(new { Id = 12 })
+                    .UsingScript("Execute_InsertRecord.sql") // Add one new record
+                    .WithIn(new { Id = 13 })
+                    .Execute();
 
-            // Now verify that the update was successful
-            var result = new Script()
-                .Database()
-                .UsingCommand("SELECT @RowCount = COUNT(*) FROM TestTable WHERE Id >= 10")
-                .WithOut(new {RowCount = DbType.Int32})
-                .Execute();
+                // Now verify that the update was successful
+                var result = new Script()
+                    .Database()
+                    .UsingCommand("SELECT @RowCount = COUNT(*) FROM TestTable WHERE Id >= 10")
+                    .WithOut(new { RowCount = DbType.Int32 })
+                    .Execute();
 
-            // Verify that the results and properties have been applied correctly
-            Assert.AreEqual(2, actual.Results.Count);
+                // Verify that the results and properties have been applied correctly
+                Assert.AreEqual(2, actual.Results.Count);
 
-            // Unable to verify the properties as the order is no longer guaranteed
-            //Assert.AreEqual(12, actual.Properties.Id);
-            //Assert.AreEqual(12, actual.Results[0].Properties.Id);
-            //Assert.AreEqual(13, actual.Results[1].Properties.Id);
+                // Unable to verify the properties as the order is no longer guaranteed
+                //Assert.AreEqual(12, actual.Properties.Id);
+                //Assert.AreEqual(12, actual.Results[0].Properties.Id);
+                //Assert.AreEqual(13, actual.Results[1].Properties.Id);
 
-            // Verify that the two scripts wer executed
-            Assert.AreEqual(2, result.Property.RowCount);
+                // Verify that the two scripts wer executed
+                Assert.AreEqual(2, result.Property.RowCount);
             }
             finally
             {
@@ -563,13 +788,13 @@ namespace xpf.IO.Test
             try
             {
 
-            // Specify a wait of 1 second and make script run for 2 seconds. This should fail!
-            new Script()
-                .Database()
-                .WithTimeout(1)
-                .UsingCommand("WAITFOR DELAY '00:00:02'")
-                .Execute();
-                
+                // Specify a wait of 1 second and make script run for 2 seconds. This should fail!
+                new Script()
+                    .Database()
+                    .WithTimeout(1)
+                    .UsingCommand("WAITFOR DELAY '00:00:02'")
+                    .Execute();
+
                 Assert.Fail("A timeout excepetion should have been raised");
             }
             catch (SqlScriptException ex)
@@ -608,9 +833,9 @@ namespace xpf.IO.Test
                 var actual = new Script()
                     .Database()
                     .UsingScript("Execute_InsertRecord.sql") // Add one new record
-                    .WithIn(new {Id = 12})
+                    .WithIn(new { Id = 12 })
                     .UsingScript("Execute_InsertRecord.sql") // Add one new record
-                    .WithIn(new {Id = 13})
+                    .WithIn(new { Id = 13 })
                     .Execute();
 
                 Assert.AreEqual("Id", actual.Properties["Id"].Name);
