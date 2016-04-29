@@ -128,19 +128,21 @@ namespace xpf.Scripting.SQLServer
                         case 10928: // The %s limit for the database is %d and has been reached
                         case 10929: // The %s limit for the database is %d and has been reached
                             // Validate if a retry should be performed
-                            shouldRetry = attempts <= retryAttempts;
-                            attempts++;
+                            shouldRetry = attempts < retryAttempts;
 
                             // Put a small delay before attempting again
                             if (shouldRetry)
+                            {
                                 Thread.Sleep(1000);
+                                attempts++;
+                            }
                             break;
                         default:
                             throw;
                     }
 
                     if (!shouldRetry)
-                        throw;
+                        throw new SqlRetryException(attempts, ex);
                 }
             } while (true);
         }

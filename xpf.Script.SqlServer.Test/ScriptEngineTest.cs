@@ -215,6 +215,22 @@ namespace xpf.Scripting.SqlServer.Test
         }
 
         [TestMethod]
+        public void When_calling_a_transient_exception_happens_its_is_retried_three_times()
+        {
+            Action action = () =>
+            {
+                // Force a timeout
+                new Script()
+                    .Database().WithConnectionString("Data Source=.;Initial Catalog=xpfScript;Trusted_Connection=yes;")
+                    .WithTimeout(1)
+                    .UsingCommand("WAITFOR DELAY '00:00:02'")
+                    .Execute();
+            };
+
+            action.ShouldThrow<SqlScriptException>().Which.RetryCount.Should().Be(3);
+        }
+
+        [TestMethod]
         public void When_calling_Execute_that_fails_a_SqlScriptException_is_thrown_without_the_password_being_exposed()
         {
             Action action = () => new Script()

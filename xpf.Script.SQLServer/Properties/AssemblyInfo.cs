@@ -33,6 +33,6 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("0.2.0")]
-[assembly: AssemblyFileVersion("0.2.0.2")]
-[assembly: AssemblyInformationalVersion("0.2.0.2")] // Used by NuGet
+[assembly: AssemblyFileVersion("0.2.0.3")]
+[assembly: AssemblyInformationalVersion("0.2.0.3")] // Used by NuGet
 

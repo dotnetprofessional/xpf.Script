@@ -277,16 +277,35 @@ namespace xpf.Scripting.SQLServer
 
                 return values;
             }
+            catch (SqlRetryException ex)
+            {
+                this.ProcessException(ex, c, scriptDetail);
+            }
             catch (SqlException ex)
             {
-                if (Script.Tracing.IsTracingEnabled)
-                    Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
-
-                // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex);
+                this.ProcessException(ex, c, scriptDetail);
             }
+
+            // Will never be called
+            return null;
         }
 
+        void ProcessException(Exception ex, SqlCommand c, ScriptDetail scriptDetail)
+        {
+            int retryCount = 0;
+
+            if (Script.Tracing.IsTracingEnabled)
+                Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
+
+            if (ex is SqlRetryException)
+            {
+                retryCount = ((SqlRetryException) ex).RetryCount;
+                ex = ex.InnerException;
+            }
+
+            // To make diagnosics easier add some important details to the exception
+            throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex, retryCount);
+        }
         /// <remarks>
         /// This is a duplicate of the sync Execute routine. Attempting to minimize code duplication further would 
         /// result in more complexity and the core code has already been centralized.
@@ -313,14 +332,17 @@ namespace xpf.Scripting.SQLServer
 
                 return values;
             }
+            catch (SqlRetryException ex)
+            {
+                this.ProcessException(ex, c, scriptDetail);
+            }
             catch (SqlException ex)
             {
-                if (Script.Tracing.IsTracingEnabled)
-                    Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
-
-                // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex);
+                this.ProcessException(ex, c, scriptDetail);
             }
+
+            // Will never be called
+            return null;
         }
         public ReaderResult ExecuteReader()
         {
@@ -344,14 +366,17 @@ namespace xpf.Scripting.SQLServer
                 this.ResetState();
                 return new ReaderResult(dataReader);
             }
+            catch (SqlRetryException ex)
+            {
+                this.ProcessException(ex, c, scriptDetail);
+            }
             catch (SqlException ex)
             {
-                if (Script.Tracing.IsTracingEnabled)
-                    Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
-
-                // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex);
+                this.ProcessException(ex, c, scriptDetail);
             }
+
+            // Will never be called
+            return null;
         }
 
         /// <remarks>
@@ -381,14 +406,17 @@ namespace xpf.Scripting.SQLServer
                 this.ResetState();
                 return new ReaderResult(dataReader);
             }
+            catch (SqlRetryException ex)
+            {
+                this.ProcessException(ex, c, scriptDetail);
+            }
             catch (SqlException ex)
             {
-                if (Script.Tracing.IsTracingEnabled)
-                    Script.Tracing.Trace(Thread.CurrentThread.ManagedThreadId, scriptDetail, null, ex);
-
-                // To make diagnosics easier add some important details to the exception
-                throw new SqlScriptException(ex.Message, this.Database.ConnectionString, c.CommandText, ex);
+                this.ProcessException(ex, c, scriptDetail);
             }
+
+            // Will never be called
+            return null;
         }
 
         SqlCommand GetDbCommandForScript(ScriptDetail scriptDetail)

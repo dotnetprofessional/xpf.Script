@@ -23,6 +23,8 @@ Version			Change
 				Removed dependency on the Enterprise Library Data Access Block.
 0.2.0.1			Bug#16: Exposing password in SqlExceptions - Fixed
 0.2.0.2			Bug#17: Transient exceptions that result in bad connections, will always fail. Now will close and reopen connections before retry.
+0.2.0.3			Feature#19: Added support to expose the retry count when transient exceptions are processed.
+				Fixed bug with retries executing 5 instead of 3 times
 
 * Denotes a file version number change only. These are typically done during a development cycle and is used to keep track of minor bug fix changes.
 				

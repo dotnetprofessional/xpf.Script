@@ -45,6 +45,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="SqlRetryException.cs" />
     <Compile Include="TableValueCollection.cs" />
     <Compile Include="IdentityMap.cs" />
     <Compile Include="IPersistType.cs" />
