@@ -539,7 +539,7 @@ namespace xpf.Scripting.SQLServer
                 case "Byte[]":
                     return SqlDbType.Binary;
                 case "String":
-                    return SqlDbType.Text;
+                    return SqlDbType.NVarChar;
                 default:
                     return SqlDbType.Variant;
             }

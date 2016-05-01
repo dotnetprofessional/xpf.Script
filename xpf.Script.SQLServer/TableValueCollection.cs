@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using Microsoft.SqlServer.Server;
 
 namespace xpf.Scripting.SQLServer
@@ -19,7 +20,14 @@ namespace xpf.Scripting.SQLServer
                 var columns = new List<SqlMetaData>();
                 var properties = this[0].GetType().GetProperties();
                 foreach (var p in properties)
-                    columns.Add(new SqlMetaData(p.Name, SqlScriptEngine.ConvertToSqlType(p.PropertyType)));
+                {
+                    var sqlType = SqlScriptEngine.ConvertToSqlType(p.PropertyType);
+                    // For some reason NVarChar is not supported - so converting to another supported type
+                    if (sqlType == SqlDbType.NVarChar)
+                        sqlType = SqlDbType.NText;
+
+                    columns.Add(new SqlMetaData(p.Name, sqlType));
+                }
 
                 var sdr = new SqlDataRecord(columns.ToArray());
 

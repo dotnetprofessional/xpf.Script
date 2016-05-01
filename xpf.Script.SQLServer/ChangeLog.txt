@@ -25,6 +25,7 @@ Version			Change
 0.2.0.2			Bug#17: Transient exceptions that result in bad connections, will always fail. Now will close and reopen connections before retry.
 0.2.0.3			Feature#19: Added support to expose the retry count when transient exceptions are processed.
 				Fixed bug with retries executing 5 instead of 3 times
+0.2.0.4			Fixed bug#20 - Was using SqlType.Text instead of SqlType.NVarChar - this however caused Structured queries to fail. This was also fixed.
 
 * Denotes a file version number change only. These are typically done during a development cycle and is used to keep track of minor bug fix changes.
 				

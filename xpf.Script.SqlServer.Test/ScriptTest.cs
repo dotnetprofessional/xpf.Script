@@ -52,6 +52,22 @@ namespace xpf.IO.Test
             Assert.AreEqual(2, result.Property.OutParam1);
         }
 
+        /// <summary>
+        /// Result of Issue#20
+        /// </summary>
+        [TestMethod]
+        public void Execute_SupportInAndOutParams_with_strings()
+        {
+            var result = new Script()
+                .Database()
+                .UsingCommand("Select @outParam1 = Id from TestTable WHERE Field1 = @MyParam1")
+                .WithIn(new { MyParam1 = "Record 2" })
+                .WithOut(new { outParam1 = DbType.Int32 })
+                .Execute();
+
+            Assert.AreEqual(2, result.Property.OutParam1);
+        }
+
         [TestMethod]
         public void Execute_SupportInParameterCollections()
         {
