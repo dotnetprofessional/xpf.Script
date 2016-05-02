@@ -9,3 +9,9 @@ Version			Change
 0.1.3			Add support for appending command text to Scripts or Commands. This introduced the new keywords
 				.AppendCommand("...")
 0.2.0			Adding support for arbitary value passing via the Bind method. See feature #13
+
+Version standards:
+Based on semantic versioning but prior to a v1.0 release naming will be one moved to the right ie
+0.x		- Results in either a breaking change or a set of major features
+0.0.x	- Feature added no breaking changes
+0.0.0.x - Bug fix release with no breaking changes (unless you relied on the bug!). May also include minor features.			
