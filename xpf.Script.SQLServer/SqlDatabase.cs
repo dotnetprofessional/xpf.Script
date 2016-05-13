@@ -55,7 +55,7 @@ namespace xpf.Scripting.SQLServer
             {
                 connection.Close(); // This should remove broken connections from the pool
                 connection.Open();
-                return command.ExecuteReader();
+                return command.ExecuteReader(CommandBehavior.CloseConnection);
             });
         }
 
@@ -69,7 +69,7 @@ namespace xpf.Scripting.SQLServer
                 connection.Close(); // This should remove broken connections from the pool
                 connection.Open();
 
-                return await command.ExecuteReaderAsync().ConfigureAwait(false);
+                return await command.ExecuteReaderAsync(CommandBehavior.CloseConnection).ConfigureAwait(false);
             }).ConfigureAwait(false);
         }
 
