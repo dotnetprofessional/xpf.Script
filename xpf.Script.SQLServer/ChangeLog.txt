@@ -26,6 +26,7 @@ Version			Change
 0.2.0.3			Minor Feature#19: Added support to expose the retry count when transient exceptions are processed.
 				Fixed bug with retries executing 5 instead of 3 times
 0.2.0.4			Fixed bug#20 - Was using SqlType.Text instead of SqlType.NVarChar - this however caused Structured queries to fail. This was also fixed.
+0.2.0.5			Fixed bug#21 - Readers not closing connections.
 
 Version standards:
 Based on semantic versioning but prior to a v1.0 release naming will be one moved to the right ie
